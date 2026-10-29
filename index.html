@@ -60,6 +60,7 @@ nav button{background:none;display:grid;justify-items:center;gap:1px;padding:6px
 dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:18px;width:min(92vw,420px);padding:16px}dialog::backdrop{background:#0009}
 .pick{display:grid;gap:6px;max-height:60vh;overflow:auto}.pick button{padding:12px;text-align:left}
 .empty{text-align:center;color:var(--muted);padding:26px 6px}
+.upd{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 8px);transform:translateX(-50%);background:var(--primary);color:#fff;padding:9px 18px;border-radius:99px;font-size:14px;z-index:15;box-shadow:0 8px 24px -8px #000;white-space:nowrap}
 .chat{display:grid;gap:10px;margin-bottom:12px}
 .bub{max-width:88%;padding:10px 12px;border-radius:16px;white-space:pre-wrap;line-height:1.65;font-size:15px;-webkit-user-select:text;user-select:text;word-break:break-word}
 .bub.me{justify-self:end;background:var(--primary);color:#fff;border-bottom-right-radius:6px}
@@ -73,13 +74,14 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 <nav id="nav" hidden></nav>
 <dialog id="dlg"><div class="pick" id="pick"></div><button class="ghost" style="width:100%;margin-top:10px" onclick="dlg.close()">取消</button></dialog>
 <div class="toast" id="toast"></div>
+<button class="upd" id="upd" hidden onclick="location.reload()">有新版本，点这里更新</button>
 <script src="relay.js"></script>
 <script src="jsQR.js"></script>
 <script>
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1';
+const LS='pe-assistant-v1',APP_VER='1.2';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -126,7 +128,7 @@ function go(k){if(running||cdEnd){toast('先停止计时再切换');return}stopC
 function pickClass(){const s=S();if(!s.classes.length){toast('电脑上还没有班级');return}
  $('pick').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">换成哪个班？</p>${s.classes.map(c=>`<button onclick="setClass('${encodeURIComponent(c)}')">${esc(c)}${c===s.className?' ✓':''}</button>`).join('')}`;$('dlg').showModal()}
 function setClass(c){c=decodeURIComponent(c);$('dlg').close();if(c===S().className)return;if(!online()){toast('换班要连上电脑才行');return}lanes=[];enqueue({t:'class',name:c});toast('正在换成 '+c+'…')}
-function moreMenu(){$('pick').innerHTML=`<button onclick="dlg.close();scanStart()">重新扫码（换电脑）</button><button onclick="dlg.close();room?.send({t:'hello'});toast('正在同步…')">立即同步</button><button onclick="dlg.close();unpair()">断开这台电脑</button>`;$('dlg').showModal()}
+function moreMenu(){$('pick').innerHTML=`<button onclick="dlg.close();scanStart()">重新扫码（换电脑）</button><button onclick="dlg.close();room?.send({t:'hello'});toast('正在同步…')">立即同步</button><button onclick="dlg.close();unpair()">断开这台电脑</button><p class="muted" style="margin:4px 0 0;text-align:center">体育助手 ${APP_VER}</p>`;$('dlg').showModal()}
 function unpair(){if(D.queue.length&&!confirm(`还有 ${D.queue.length} 条没传到电脑，断开后会丢掉，确定？`))return;room?.close();room=null;D={room:'',key:'',session:null,queue:[],done:{},ended:[...(D.ended||[]),D.room].slice(-10)};persist();draw()}
 // ======== 欢迎页 + 扫码 ========
 function welcome(){$('app').innerHTML=`<div class="welcome"><img class="logo" src="icon-192.png" alt=""><h1>体育助手</h1><p class="muted">和电脑上的「体育教师工作台」配对后，<br>打开就能看今天的课，计时、成绩、视频直接传到电脑。</p>
@@ -332,5 +334,14 @@ setInterval(()=>{if(tab==='today'&&D.room&&!document.hidden&&document.activeElem
 const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||/androidplatform/.test(location.host);
 const href=location.href,lk=parseLink(href);if(lk&&(D.ended||[]).includes(lk.room)){history.replaceState(null,'',location.pathname);overlay();connect();draw();if(!D.room)toast('这次连接已经结束，请在电脑上重新开始连接后再扫码')}else if(lk){if(standalone)history.replaceState(null,'',location.pathname);pair(href)}else{overlay();connect();draw()}
 vidLoad();
-if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host))navigator.serviceWorker.register('sw.js').catch(()=>{});
+// 网页版有新版本时：手边没在用就自动刷新；正在计时、录像、输入时，顶部提示点一下再更新
+function appUpdated(){if(appUpdated.done)return;appUpdated.done=true;
+ let recent=false;try{recent=Date.now()-Number(sessionStorage.getItem('pe-reloaded')||0)<30000}catch{}
+ const busy=running||cdEnd||recorder||Object.keys(aiReq).length||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||$('dlg').open||$('scan');
+ if(!busy&&!recent){try{sessionStorage.setItem('pe-reloaded',String(Date.now()))}catch{}location.reload();return}
+ $('upd').hidden=false}
+if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host)){const hadSW=!!navigator.serviceWorker.controller;
+ navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.t==='updated')appUpdated()});
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadSW)appUpdated()});
+ navigator.serviceWorker.register('sw.js').catch(()=>{})}
 </script></body></html>

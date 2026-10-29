@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0a1222"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="体育助手">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-192.png"><link rel="icon" href="icon-192.png">
+<title>体育助手</title>
+<style>
+/* 上课单手用：深色省电、按钮大、数字大 */
+:root{--bg:#0a1222;--card:#141e36;--card2:#1b2848;--line:#26345a;--ink:#f1f5ff;--muted:#93a3c4;--primary:#2f6bff;--accent:#22c3ee;--ok:#34d399;--warn:#fbbf24;--bad:#fb7185;--num:"DIN Alternate","Bahnschrift","Helvetica Neue",sans-serif;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+body{padding:max(10px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(76px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;min-height:44px}
+header h1{margin:0;font-size:19px}
+.st{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:#64748b}.dot.on{background:var(--ok);box-shadow:0 0 0 4px #34d39922}.dot.wait{background:var(--warn)}
+button{font:inherit;color:inherit;border:0;border-radius:14px;cursor:pointer;touch-action:manipulation;background:var(--card2)}
+button:disabled{opacity:.4}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;margin-bottom:12px}
+.card h2{margin:0 0 10px;font-size:17px}
+.muted{color:var(--muted);font-size:14px}
+.clock{font:700 64px/1 var(--num);text-align:center;letter-spacing:-1px;font-variant-numeric:tabular-nums;margin:6px 0 12px}.clock small{font-size:.42em;opacity:.6}
+.start{width:100%;padding:18px;font-size:21px;font-weight:800;background:linear-gradient(135deg,#3b7bff,#1f4fd6);box-shadow:0 10px 24px -10px #2f6bffcc}
+.start.stop{background:#3a2030;color:#ffb3c0;box-shadow:none}
+.lanes{display:grid;gap:10px;margin-top:12px}
+.lane{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:14px;min-height:74px;border:2px solid transparent;text-align:left}
+.lane.go{border-color:var(--accent);background:#17345a}.lane.done{background:#123a2e;border-color:#1f7a5a}.lane.sent{opacity:.55}
+.lane b{font:700 24px var(--num);width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#ffffff14}
+.lane .who{display:grid}.lane .who strong{font-size:19px}.lane .who span{font-size:13px;color:var(--muted)}.lane .t{font:700 28px var(--num)}
+.row2{display:flex;gap:10px;margin-top:12px}.row2>*{flex:1}
+.ghost{padding:13px;background:#ffffff10;font-size:16px}
+.sub{padding:15px;font-size:18px;font-weight:800;background:var(--ok);color:#06261a}
+select,input,textarea{font:inherit;color:var(--ink);background:#0f1a30;border:1px solid var(--line);border-radius:12px;padding:11px;width:100%}
+textarea{min-height:70px}
+.list{display:grid;gap:8px;margin-top:10px}
+.item{display:grid;grid-template-columns:1fr 104px;gap:10px;align-items:center;padding:9px 12px;background:var(--card2);border-radius:14px}
+.item.ok{background:#123a2e}.item.wait{background:#3a3415}.item small{color:var(--muted)}
+.item input{padding:9px;font:700 21px var(--num);text-align:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.chips button{padding:7px 12px;font-size:14px;border-radius:99px}.chips button.on{background:var(--primary);color:#fff}
+.seg{display:flex;background:#0f1a30;border-radius:14px;padding:4px;margin-bottom:12px}.seg button{flex:1;padding:10px 4px;background:none;font-size:15px}.seg button.on{background:var(--primary);color:#fff}
+.course{display:grid;grid-template-columns:62px 1fr;gap:12px;padding:12px;background:var(--card2);border-radius:16px;margin-top:8px;text-align:left;width:100%}
+.course.now{background:linear-gradient(135deg,#1d4ed8,#0e7490)}.course.past{opacity:.5}
+.course .tm{font:700 15px/1.25 var(--num);color:var(--accent)}.course.now .tm{color:#fff}.course .tm small{display:block;opacity:.75;font-weight:400}
+.course strong{font-size:17px;display:block}.course span{font-size:13px;color:var(--muted)}.course.now span{color:#dbeafe}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;background:#ffffff22;margin-left:6px;vertical-align:2px}
+.lesson{white-space:pre-wrap;font-size:15px;line-height:1.7;background:#0f1a30;border-radius:14px;padding:12px;margin-top:10px;-webkit-user-select:text;user-select:text}
+.week{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}.week th,.week td{border:1px solid var(--line);padding:4px;vertical-align:top;word-break:break-all}.week th{color:var(--muted);font-weight:500}.week td.today{background:#17345a}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);background:#0d1629ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 6px max(6px,env(safe-area-inset-bottom));z-index:5}
+nav[hidden]{display:none}
+nav button{background:none;display:grid;justify-items:center;gap:1px;padding:6px 0;font-size:12px;color:var(--muted)}nav button i{font-style:normal;font-size:21px;line-height:1.1}nav button.on{color:#fff}nav button.on i{color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#000d;padding:10px 18px;border-radius:99px;font-size:15px;display:none;z-index:9;max-width:90vw;text-align:center}
+.welcome{text-align:center;padding-top:9vh}.welcome .logo{width:96px;height:96px;border-radius:26px;margin:0 auto 18px;display:block}
+.welcome h1{font-size:26px;margin:0 0 6px}
+.scan{position:fixed;inset:0;background:#000;z-index:20;display:grid;place-items:center}.scan video{width:100%;height:100%;object-fit:cover}.scan .frame{position:absolute;width:66vmin;height:66vmin;border:3px solid var(--accent);border-radius:22px;box-shadow:0 0 0 100vmax #0008}.scan .tip{position:absolute;top:max(30px,env(safe-area-inset-top));left:0;right:0;text-align:center;font-size:17px}.scan button{position:absolute;bottom:max(30px,env(safe-area-inset-bottom));padding:14px 40px;background:#ffffff22}
+.cam{width:100%;border-radius:16px;background:#000;aspect-ratio:3/4;object-fit:cover;display:block}
+.rec{display:flex;align-items:center;justify-content:center;gap:8px;font:700 20px var(--num);margin:8px 0}.rec i{width:12px;height:12px;border-radius:50%;background:var(--bad);animation:bl 1s infinite}@keyframes bl{50%{opacity:.2}}
+.vrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}.vrow:first-child{border-top:0}
+.bar{height:6px;border-radius:99px;background:#ffffff14;overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;background:var(--accent)}
+dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:18px;width:min(92vw,420px);padding:16px}dialog::backdrop{background:#0009}
+.pick{display:grid;gap:6px;max-height:60vh;overflow:auto}.pick button{padding:12px;text-align:left}
+.empty{text-align:center;color:var(--muted);padding:26px 6px}
+</style></head><body>
+<header id="head"></header>
+<main id="app"></main>
+<nav id="nav" hidden></nav>
+<dialog id="dlg"><div class="pick" id="pick"></div><button class="ghost" style="width:100%;margin-top:10px" onclick="dlg.close()">取消</button></dialog>
+<div class="toast" id="toast"></div>
+<script src="relay.js"></script>
+<script src="jsQR.js"></script>
+<script>
+// ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS='pe-assistant-v1';
+let D={room:'',key:'',session:null,queue:[],done:{}};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
+const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
+let tab='today',room=null,lastPong=0,timerMode='lanes';
+const toast=t=>{const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',2400)};
+const mid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+let ac=null;const ctx=()=>{ac??=new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();return ac};
+function beep(f=880,d=.12,v=.4){try{const c=ctx(),t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.frequency.value=f;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(c.destination);o.start(t);o.stop(t+d+.02)}catch{}}
+function whistle(d=.8){try{const c=ctx(),t=c.currentTime,o=c.createOscillator(),l=c.createOscillator(),lg=c.createGain(),g=c.createGain();o.frequency.value=2750;l.frequency.value=26;lg.gain.value=220;l.connect(lg).connect(o.frequency);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.35,t+.03);g.gain.setValueAtTime(.35,t+d-.08);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(c.destination);o.start(t);l.start(t);o.stop(t+d);l.stop(t+d)}catch{}}
+const vibe=ms=>{try{navigator.vibrate?.(ms)}catch{}};
+const S=()=>D.session||{className:'',classes:[],metrics:[],items:[],students:[],plan:{times:[],week:{},lessons:[]}};
+// ======== 连接电脑 ========
+const online=()=>!!room?.up&&Date.now()-lastPong<25000;
+function parseLink(txt){try{const h=String(txt).split('#')[1]||'',p=new URLSearchParams(h),r=p.get('r'),k=p.get('k');return PERelay.okRoom(r)&&PERelay.okKey(k)?{room:r,key:k}:null}catch{return null}}
+async function pair(link){const p=parseLink(link);if(!p){toast('这不是工作台的连接码');return false}
+ if(D.room&&D.room!==p.room&&D.queue.length&&!confirm(`还有 ${D.queue.length} 条没传到电脑，换电脑后这些会丢掉，确定？`))return false;
+ D={room:p.room,key:p.key,session:D.room===p.room?D.session:null,queue:D.room===p.room?D.queue:[],done:{}};persist();await connect();tab='today';draw();toast('已连接，正在同步课表…');if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))setTimeout(()=>toast('点下方「分享」→「添加到主屏幕」，以后像 App 一样打开'),3500);return true}
+async function connect(){room?.close();room=null;if(!D.room)return;
+ try{room=await PERelay.openRoom({room:D.room,key:D.key,side:'phone',onMsg,onState:up=>{if(up){room.send({t:'hello'});flush()}head()}})}catch(e){toast(e.message)}}
+function onMsg(m){lastPong=Date.now();
+ if(m.t==='session'){const had=!!D.session;D.session=m;delete m.t;persist();if(!had)toast('课表和名单已同步');overlay();draw()}
+ else if(m.t==='pong'){}
+ else if(m.t==='ack'){const q=D.queue.find(x=>x.mid===m.mid);D.queue=D.queue.filter(x=>x.mid!==m.mid);persist();if(q&&!m.ok){toast(m.reason||'电脑没收下');if(q.t==='score')delete D.done[q.id+'|'+q.metric]}if(q?.t==='score'&&m.ok){const s=S().students.find(x=>x.id===q.id);if(s){if(m.value==='')delete s.sc[q.metric];else s.sc[q.metric]=m.value}}draw(true)}
+ else if(m.t==='vok'||m.t==='vdone')vidMsg(m);
+ else if(m.t==='bye'){room?.close();room=null;D.room='';D.key='';D.queue=[];persist();toast('电脑那边结束了连接，需要时重新扫码');draw()}
+ head()}
+// 没收到回复的，每 4 秒重发一次；手机没信号时攒着，等有信号再发
+function flush(){if(!room?.up)return;for(const q of D.queue.slice(0,20))room.send(q)}
+setInterval(()=>{if(room?.up){room.send({t:'ping'});flush()}head()},5000);
+function enqueue(msg){msg.mid=mid();D.queue.push(msg);persist();if(room?.up)room.send(msg);head();return msg}
+// 还没被电脑确认的成绩，先显示在手机上
+function overlay(){for(const q of D.queue)if(q.t==='score'){const s=S().students.find(x=>x.id===q.id);if(s)D.done[q.id+'|'+q.metric]=q.value}}
+const valOf=(s,k)=>{const p=D.done[s.id+'|'+k];if(p!==undefined&&D.queue.some(q=>q.t==='score'&&q.id===s.id&&q.metric===k))return p;return s.sc?.[k]};
+const pendingOf=(s,k)=>D.queue.some(q=>q.t==='score'&&q.id===s.id&&q.metric===k);
+function sendScore(s,k,v){D.done[s.id+'|'+k]=v;enqueue({t:'score',id:s.id,metric:k,value:v});beep(1200,.06,.25);vibe(30)}
+// ======== 顶部和底部 ========
+function head(){if(!D.room){$('head').innerHTML='';return}const s=S(),n=D.queue.length+vids.filter(v=>!v.done).length;
+ $('head').innerHTML=`<div><h1>${tab==='today'?'今天的课':{timer:'计时',score:'记成绩',practice:'课堂练习',video:'拍视频'}[tab]}</h1><div class="st"><span class="dot ${online()?'on':room?.up?'wait':''}"></span>${online()?'已连上电脑':room?.up?'电脑没开或没联网':'手机没网'}${n?` · ${n} 条待传`:''}</div></div>${tab==='today'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="moreMenu()">⋯</button>':`<button class="ghost" style="padding:9px 12px;font-size:14px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="pickClass()">${esc(s.className||'选择班级')} ▾</button>`}`}
+const TABS=[['today','▦','今天'],['timer','⏱','计时'],['score','✎','成绩'],['practice','↻','练习'],['video','●','视频']];
+function nav(){const n=$('nav');n.hidden=!D.room;n.innerHTML=TABS.map(([k,i,l])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')"><i>${i}</i>${l}</button>`).join('')}
+function go(k){if(running||cdEnd){toast('先停止计时再切换');return}stopCam();tab=k;draw();scrollTo(0,0)}
+function pickClass(){const s=S();if(!s.classes.length){toast('电脑上还没有班级');return}
+ $('pick').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">换成哪个班？</p>${s.classes.map(c=>`<button onclick="setClass('${encodeURIComponent(c)}')">${esc(c)}${c===s.className?' ✓':''}</button>`).join('')}`;$('dlg').showModal()}
+function setClass(c){c=decodeURIComponent(c);$('dlg').close();if(c===S().className)return;if(!online()){toast('换班要连上电脑才行');return}lanes=[];enqueue({t:'class',name:c});toast('正在换成 '+c+'…')}
+function moreMenu(){$('pick').innerHTML=`<button onclick="dlg.close();scanStart()">重新扫码（换电脑）</button><button onclick="dlg.close();room?.send({t:'hello'});toast('正在同步…')">立即同步</button><button onclick="dlg.close();unpair()">断开这台电脑</button>`;$('dlg').showModal()}
+function unpair(){if(D.queue.length&&!confirm(`还有 ${D.queue.length} 条没传到电脑，断开后会丢掉，确定？`))return;room?.close();room=null;D={room:'',key:'',session:null,queue:[],done:{}};persist();draw()}
+// ======== 欢迎页 + 扫码 ========
+function welcome(){$('app').innerHTML=`<div class="welcome"><img class="logo" src="icon-192.png" alt=""><h1>体育助手</h1><p class="muted">和电脑上的「体育教师工作台」配对后，<br>打开就能看今天的课，计时、成绩、视频直接传到电脑。</p>
+ <button class="start" style="margin-top:26px" onclick="scanStart()">扫码连接电脑</button>
+ <p class="muted" style="margin-top:22px">在电脑上打开工作台 →「幸福工具」→「手机助手」→「开始连接手机」，<br>屏幕上会出现二维码。</p>
+ <details style="margin-top:18px;text-align:left"><summary class="muted">扫不了码？</summary><p class="muted">在电脑二维码下方复制连接网址，粘贴到这里：</p><input id="lnk" placeholder="https://…#r=…"><button class="ghost" style="width:100%;margin-top:8px" onclick="pair($('lnk').value)">连接</button></details></div>`}
+let scanStream=null,scanRaf=0;
+async function scanStart(){try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})}catch{toast('打不开相机，请在手机设置里允许「体育助手」使用相机');return}
+ const box=document.createElement('div');box.className='scan';box.id='scan';box.innerHTML='<video playsinline muted autoplay></video><div class="frame"></div><div class="tip">对准电脑上的二维码</div><button onclick="scanStop()">取消</button>';document.body.append(box);
+ const v=box.querySelector('video');v.srcObject=scanStream;const c=document.createElement('canvas'),g=c.getContext('2d',{willReadFrequently:true});
+ const loop=()=>{if(!scanStream)return;if(v.videoWidth){const w=Math.min(720,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);c.width=w;c.height=h;g.drawImage(v,0,0,w,h);const r=jsQR(g.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'});
+  if(r?.data&&parseLink(r.data)){vibe(60);beep(1400,.08);scanStop();pair(r.data);return}}scanRaf=requestAnimationFrame(loop)};loop()}
+function scanStop(){cancelAnimationFrame(scanRaf);scanStream?.getTracks().forEach(t=>t.stop());scanStream=null;$('scan')?.remove()}
+// ======== 今天 ========
+const WD=['周一','周二','周三','周四','周五','周六','周日'];
+const nowMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};const toMin=t=>+t.slice(0,2)*60+ +t.slice(3,5);
+const dayIdx=()=>(new Date().getDay()+6)%7;
+function lessonFor(text){const L=S().plan?.lessons||[];return L.find(l=>l.title&&text.includes(l.title))||L.find(l=>l.title&&l.title.length>=2&&l.title.split(/[\s·,，、]+/).some(w=>w.length>=2&&text.includes(w)))||null}
+let openCourse=null,showWeek=false,openLesson='';
+function today(){const s=S(),p=s.plan||{},d=dayIdx(),now=nowMin();
+ if(!D.session){$('app').innerHTML=`<div class="empty">${room?.up?'正在从电脑同步课表…<br>请确认电脑上的工作台开着。':'正在连接…'}</div>`;return}
+ const list=Object.entries(p.week||{}).filter(([k,v])=>+k[0]===d&&v).map(([k,v])=>{const i=+k[2],[a,b]=p.times?.[i]||['',''];return {i,v,a,b}}).sort((x,y)=>(x.a||'').localeCompare(y.a||''));
+ const cur=list.find(c=>c.a&&now>=toMin(c.a)&&now<toMin(c.b)),next=list.find(c=>c.a&&now<toMin(c.a));
+ if(openCourse===null)openCourse=(cur||next)?.i??-1;
+ const date=new Date().toLocaleDateString('zh-CN',{month:'long',day:'numeric'});
+ $('app').innerHTML=`<p class="muted" style="margin:-6px 0 8px">${date} ${WD[d]}${list.length?` · ${list.length} 节体育课`:''}</p>
+ ${list.length?list.map(c=>{const past=c.b&&now>=toMin(c.b),isNow=c===cur,l=lessonFor(c.v),cls=(s.classes||[]).find(x=>c.v.includes(x)||c.v.replace(/\s/g,'').includes(x.replace(/[\s·]/g,'')));
+  return `<button class="course ${isNow?'now':past?'past':''}" onclick="openCourse=openCourse===${c.i}?-1:${c.i};draw()"><div class="tm">第${c.i+1}节<small>${esc(c.a)}${c.b?'–'+esc(c.b):''}</small></div><div><strong>${esc(c.v)}${isNow?'<span class="tag">正在上</span>':c===next?'<span class="tag">下一节</span>':''}</strong><span>${l?'教案：'+esc(l.title):'没有找到对应教案'}</span></div></button>
+  ${openCourse===c.i?`<div class="card" style="margin-top:8px">${cls&&cls!==s.className?`<button class="ghost" style="width:100%;margin-bottom:8px" onclick="setClass('${encodeURIComponent(cls)}')">这节课用 ${esc(cls)} 的名单</button>`:''}${l?`<b>${esc(l.title)}</b> <span class="muted">${esc(l.grade)} · ${esc(l.date)}</span><div class="lesson">${esc(l.text)}</div>`:'<p class="muted">电脑上「教案备课」里写一份教案，标题里写上这节课的内容（比如「立定跳远」），就会自动配上。</p>'}</div>`:''}`}).join(''):`<div class="card empty">今天没有体育课 ☕<br><span class="muted">电脑「每周课表」里排的课会显示在这里。</span></div>`}
+ <div class="row2"><button class="ghost" onclick="showWeek=!showWeek;draw()">${showWeek?'收起':'看'}本周课表</button><button class="ghost" onclick="lessonList()">全部教案</button></div>
+ ${showWeek?`<div class="card" style="margin-top:12px;padding:8px"><table class="week"><tr><th style="width:34px"></th>${WD.slice(0,5).map((w,i)=>`<th class="${i===d?'today':''}">${w}</th>`).join('')}</tr>${Array.from({length:Math.max(6,(p.times||[]).length)},(_,i)=>`<tr><th>${i+1}</th>${[0,1,2,3,4].map(x=>`<td class="${x===d?'today':''}">${esc(p.week?.[x+'-'+i]||'')}</td>`).join('')}</tr>`).join('')}</table></div>`:''}
+ ${openLesson?(()=>{const l=(p.lessons||[]).find(x=>x.id===openLesson);return l?`<div class="card" style="margin-top:12px"><b>${esc(l.title)}</b> <span class="muted">${esc(l.grade)} · ${esc(l.date)}</span><div class="lesson">${esc(l.text)}</div></div>`:''})():''}`}
+function lessonList(){const L=S().plan?.lessons||[];if(!L.length){toast('电脑上还没有教案');return}$('pick').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">最近的教案</p>${L.map(l=>`<button onclick="openLesson='${esc(l.id)}';dlg.close();draw()">${esc(l.title)} <small style="color:var(--muted)">${esc(l.grade)} · ${esc(l.date)}</small></button>`).join('')}`;$('dlg').showModal()}
+// ======== 计时 ========
+let lanesN=4,lanes=[],t0=0,running=false,raf=0,cdEnd=0,cdTimer=0,cdLen=60,swLaps=[],laneTarget='';
+const timeMetrics=()=>S().metrics.filter(([k])=>['run','shuttle'].includes(k));
+const fmt=ms=>{const s=ms/1000;return `${Math.floor(s/60)?Math.floor(s/60)+':':''}${(s%60).toFixed(1).padStart(Math.floor(s/60)?4:3,'0')}`};
+const toTenth=ms=>Math.ceil(Math.round(ms)/100)/10; // 国家标准：跑步成绩记到 0.1 秒，后一位非零进一
+function timer(){const seg=`<div class="seg">${[['lanes','分道计时'],['cd','倒计时'],['sw','秒表']].map(([k,l])=>`<button class="${k===timerMode?'on':''}" onclick="if(!running&&!cdEnd){timerMode='${k}';draw()}">${l}</button>`).join('')}</div>`;
+ if(timerMode==='cd')return renderCd(seg);if(timerMode==='sw')return renderSw(seg);
+ if(!S().students.length){$('app').innerHTML=seg+'<div class="card empty">先点右上角选一个班级</div>';return}
+ const tm=timeMetrics();if(!laneTarget||(laneTarget!=='practice'&&!laneTarget.startsWith('c:')&&!tm.some(([k])=>k===laneTarget))||(laneTarget.startsWith('c:')&&!custom().some(c=>'c:'+c.name===laneTarget)))laneTarget=tm[0]?.[0]||'practice';
+ const free=laneTarget==='practice'||laneTarget.startsWith('c:'),has=st=>free?false:valOf(st,laneTarget)!==undefined;
+ const busy=new Set(lanes.filter(l=>l.st&&!l.sent).map(l=>l.st.id)),pool=S().students.filter(st=>(free||st.req.includes(laneTarget))&&!has(st)&&!busy.has(st.id));
+ lanes=Array.from({length:lanesN},(_,i)=>{const o=lanes[i];if(o&&o.st&&!o.sent)return o;return {st:pool.shift()||null,t:null,sent:false}});
+ const anyT=lanes.some(l=>l.t!==null&&!l.sent);
+ $('app').innerHTML=`${seg}<section class="card">${running?'':`<div class="chips">记到：${tm.map(([k,l])=>`<button class="${laneTarget===k?'on':''}" onclick="laneTarget='${k}';lanes=[];draw()">${esc(l)}（体测）</button>`).join('')}${custom().filter(c=>c.unit==='秒').map(c=>`<button class="${laneTarget==='c:'+c.name?'on':''}" onclick="laneTarget='c:'+decodeURIComponent('${encodeURIComponent(c.name)}');lanes=[];draw()">${esc(c.name)}</button>`).join('')}<button class="${laneTarget==='practice'?'on':''}" onclick="laneTarget='practice';lanes=[];draw()">课堂练习</button></div>`}
+ <div class="clock" id="clock">${running?'':'0.0'}<small> 秒</small></div><button class="start ${running?'stop':''}" onclick="${running?'stopRun()':'startRun()'}">${running?'停止计时':'开始（鸣哨）'}</button>
+ <div class="lanes">${lanes.map((l,i)=>`<button class="lane ${l.sent?'sent':l.t!==null?'done':running&&l.st?'go':''}" onpointerdown="tapLane(${i},event)" ${l.st?'':'disabled'}><b>${i+1}</b><span class="who"><strong>${l.st?esc(l.st.name):'（空道）'}</strong><span>${l.st?`学号 ${esc(l.st.number)} · ${esc(l.st.gender)}${running?'':' · 点名字换人'}`:''}</span></span><span class="t">${l.t!==null?toTenth(l.t).toFixed(1):l.sent?'✓':''}</span></button>`).join('')}</div>
+ <div class="row2">${anyT&&!running?`<button class="sub" onclick="submitLanes()">保存这组成绩</button><button class="ghost" onclick="lanes.forEach(l=>{if(!l.sent)l.t=null});draw()">整组重跑</button>`:''}</div>
+ ${running?'':`<div class="chips" style="justify-content:center">一组 ${[1,2,3,4,5,6,8].map(n=>`<button class="${n===lanesN?'on':''}" onclick="lanesN=${n};lanes=lanes.slice(0,${n});draw()">${n}</button>`).join('')} 人</div>`}
+ <p class="muted" style="text-align:center;margin:8px 0 0">${pool.length+lanes.filter(l=>l.st&&!l.sent).length?'按「开始」后，谁冲线就按谁':'这个班都测完了 🎉'}</p></section>`}
+function startRun(){if(!lanes.some(l=>l.st&&l.t===null)){toast('这组没有要跑的学生');return}ctx();whistle(.5);vibe(80);t0=performance.now();running=true;draw();tick()}
+function tick(){if(!running)return;const c=$('clock');if(c)c.innerHTML=`${fmt(performance.now()-t0)}<small> 秒</small>`;raf=requestAnimationFrame(tick)}
+function stopRun(){running=false;cancelAnimationFrame(raf);draw()}
+function tapLane(i,e){const l=lanes[i];if(!l.st||l.sent)return;
+ if(!running){if(l.t!==null){l.t=null;draw();return}e.preventDefault();lanePick(i);return}
+ if(l.t!==null)return;l.t=performance.now()-t0;beep(1500,.05,.3);vibe(40);if(lanes.every(x=>!x.st||x.t!==null)){running=false;cancelAnimationFrame(raf)}draw()}
+function lanePick(i){const busy=new Set(lanes.map(l=>l.st?.id)),opts=S().students.filter(s=>!busy.has(s.id)&&(laneTarget==='practice'||laneTarget.startsWith('c:')||s.req.includes(laneTarget)));$('pick').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">第 ${i+1} 道换成：</p>${opts.map(s=>`<button onclick="setLane(${i},'${s.id}')">${esc(s.name)} <small style="color:var(--muted)">学号 ${esc(s.number)}</small></button>`).join('')}<button onclick="setLane(${i},'')">空出这一道</button>`;$('dlg').showModal()}
+function setLane(i,id){lanes[i]={st:S().students.find(s=>s.id===id)||null,t:null,sent:false};$('dlg').close();draw()}
+function submitLanes(){const todo=lanes.filter(l=>l.st&&l.t!==null&&!l.sent);if(!todo.length)return;
+ if(laneTarget==='practice'){const item=prompt('这是什么练习？','50米跑练习');if(!item)return;enqueue({t:'practice',item:item.trim().slice(0,30),unit:'秒',rows:todo.map(l=>({id:l.st.id,value:toTenth(l.t)}))});beep(1200,.06,.25)}
+ else if(laneTarget.startsWith('c:'))enqueue({t:'practice',item:laneTarget.slice(2),unit:'秒',rows:todo.map(l=>({id:l.st.id,value:toTenth(l.t)})),note:'自定义项目'});
+ else todo.forEach(l=>sendScore(l.st,laneTarget,toTenth(l.t)));
+ todo.forEach(l=>l.sent=true);lanes=[];toast(`已保存 ${todo.length} 人${online()?'':'，有信号后自动传到电脑'}`);draw()}
+function renderCd(seg){const left=cdEnd?Math.max(0,cdEnd-Date.now()):cdLen*1000;
+ $('app').innerHTML=`${seg}<section class="card"><div class="clock" id="clock">${Math.ceil(left/1000)}<small> 秒</small></div>${cdEnd?'':`<div class="chips" style="justify-content:center">${[30,60,120,180,300].map(n=>`<button class="${n===cdLen?'on':''}" onclick="cdLen=${n};draw()">${n<60?n+' 秒':n/60+' 分钟'}</button>`).join('')}</div>`}
+ <button class="start ${cdEnd?'stop':''}" onclick="${cdEnd?'stopCd()':'startCd()'}">${cdEnd?'停止':'开始（鸣哨）'}</button><p class="muted" style="text-align:center">跳绳、仰卧起坐、练习轮换都能用。最后 3 秒滴滴提示，到点长哨。<br>时间到后去「成绩」或「练习」里输入次数。</p></section>`}
+function startCd(){ctx();whistle(.5);vibe(80);cdEnd=Date.now()+cdLen*1000;draw();let last=null;clearInterval(cdTimer);cdTimer=setInterval(()=>{const left=cdEnd-Date.now(),s=Math.ceil(left/1000),c=$('clock');if(c)c.innerHTML=`${Math.max(0,s)}<small> 秒</small>`;if(s<=3&&s>0&&last!==s){last=s;beep(880,.12)}if(left<=0){clearInterval(cdTimer);cdEnd=0;whistle(1.1);vibe([200,100,200]);toast('时间到！');draw()}},100)}
+function stopCd(){clearInterval(cdTimer);cdEnd=0;draw()}
+function renderSw(seg){$('app').innerHTML=`${seg}<section class="card"><div class="clock" id="clock">${running?'':fmt(swLaps.at(-1)||0)}<small> 秒</small></div><div class="row2" style="margin-top:0"><button class="start ${running?'stop':''}" onclick="${running?'swStop()':'swStart()'}">${running?'停止':'开始'}</button>${running?'<button class="ghost" style="font-size:20px" onclick="swLap()">计次</button>':swLaps.length?'<button class="ghost" onclick="swLaps=[];draw()">清零</button>':''}</div>
+ <div class="list">${swLaps.map((t,i)=>`<div class="item" style="grid-template-columns:1fr auto"><span>第 ${i+1} 次</span><strong style="font:700 20px var(--num)">${fmt(t)} 秒</strong></div>`).reverse().join('')}</div></section>`}
+function swStart(){ctx();beep(1000,.08);t0=performance.now()-(swLaps.at(-1)||0);swLaps=[];running=true;draw();tick()}
+function swLap(){swLaps.push(performance.now()-t0);beep(1500,.05,.3);vibe(30);const l=$('app').querySelector('.list');if(l)l.insertAdjacentHTML('afterbegin',`<div class="item" style="grid-template-columns:1fr auto"><span>第 ${swLaps.length} 次</span><strong style="font:700 20px var(--num)">${fmt(swLaps.at(-1))} 秒</strong></div>`)}
+function swStop(){swLaps.push(performance.now()-t0);running=false;cancelAnimationFrame(raf);draw()}
+// ======== 记成绩（体测项目） ========
+let scoreKey='';
+function valid(k,v){if(v==='')return true;if(!Number.isFinite(v))return false;if(['rope','situp','lung'].includes(k)&&!Number.isInteger(v))return false;if(['height','weight','run','lung','shuttle'].includes(k))return v>0;return k==='reach'||v>=0}
+const custom=()=>S().custom||[];
+function score(){const s=S();if(!s.students.length){$('app').innerHTML='<div class="card empty">先点右上角选一个班级</div>';return}
+ const cus=custom();if(!scoreKey||(!scoreKey.startsWith('c:')&&!s.metrics.some(([k])=>k===scoreKey))||(scoreKey.startsWith('c:')&&!cus.some(c=>'c:'+c.name===scoreKey)))scoreKey=s.metrics[0]?.[0]||(cus[0]?'c:'+cus[0].name:'');
+ const chips=`<p class="muted" style="margin:0">国家体质健康测试 · ${esc(s.className)}</p><div class="chips">${s.metrics.map(([k,l])=>`<button class="${k===scoreKey?'on':''}" onclick="scoreKey='${k}';draw()">${esc(l)}</button>`).join('')||'<span class="muted">这个年级没有体测项目</span>'}</div>
+ <p class="muted" style="margin:6px 0 0">自定义项目</p><div class="chips">${cus.map(c=>`<button class="${'c:'+c.name===scoreKey?'on':''}" onclick="scoreKey='c:'+decodeURIComponent('${encodeURIComponent(c.name)}');draw()">${esc(c.name)}</button>`).join('')}<button onclick="itemAdd()" style="border:1px dashed var(--line);background:none">＋ 添加项目</button></div>`;
+ if(!scoreKey){$('app').innerHTML=chips;return}
+ if(scoreKey.startsWith('c:'))return customScore(chips,cus.find(c=>'c:'+c.name===scoreKey));
+ const m=s.metrics.find(([k])=>k===scoreKey),list=s.students.filter(x=>x.req.includes(scoreKey)),done=list.filter(x=>valOf(x,scoreKey)!==undefined).length;
+ $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">${esc(m?.[1])}（${esc(m?.[2])}）· 已有 ${done}/${list.length} 人 · 输完一个按回车跳下一个${scoreKey==='reach'?' · 可以填负数':''}</p>
+ <div class="list">${list.map((x,i)=>{const v=valOf(x,scoreKey),w=pendingOf(x,scoreKey);return `<div class="item ${w?'wait':v!==undefined?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}${w?' · 待传':''}</small></div><input inputmode="decimal" id="s${i}" placeholder="${esc(m?.[2])}" value="${v??''}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('s${i+1}')?.focus()}" onchange="scoreSave('${x.id}',this)"></div>`}).join('')}</div>`}
+function scoreSave(id,inp){const x=S().students.find(s=>s.id===id),raw=inp.value.trim().replace('，','.');if(raw===''&&valOf(x,scoreKey)===undefined)return;const v=raw===''?'':Number(raw);if(!valid(scoreKey,v)){toast('这个成绩不对，请检查');inp.value=valOf(x,scoreKey)??'';return}
+ sendScore(x,scoreKey,v);inp.closest('.item').className='item wait'}
+// 自定义项目：一项一张表，记完点保存，存进电脑「课堂练习」
+let cv={};try{cv=JSON.parse(localStorage.getItem(LS+'-cv'))||{}}catch{}
+const cvSave=()=>{try{localStorage.setItem(LS+'-cv',JSON.stringify(cv))}catch{}};
+function customScore(chips,c){const s=S(),vals=cv[c.name]??={},n=s.students.filter(x=>vals[x.id]).length;
+ $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">${esc(c.name)}（${esc(c.unit)}${c.lower?'，越少越好':''}）· 已记 ${n}/${s.students.length} 人 · 没测的空着 <button class="ghost" style="padding:3px 10px;font-size:12px;float:right" onclick="itemDel()">删除项目</button></p>
+ <div class="list">${s.students.map((x,i)=>`<div class="item ${vals[x.id]?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}</small></div><input inputmode="decimal" id="c${i}" placeholder="${esc(c.unit)}" value="${esc(vals[x.id]||'')}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('c${i+1}')?.focus()}" onchange="cv[decodeURIComponent('${encodeURIComponent(c.name)}')]['${x.id}']=this.value.trim();cvSave();this.closest('.item').classList.toggle('ok',!!this.value.trim())"></div>`).join('')}</div>
+ <button class="sub" style="width:100%;margin-top:14px" onclick="customSend()">保存${esc(c.name)}成绩（${n} 人）</button>`}
+function customSend(){const c=custom().find(x=>'c:'+x.name===scoreKey);if(!c)return;const s=S(),vals=cv[c.name]||{};
+ const rows=s.students.filter(x=>vals[x.id]).map(x=>({id:x.id,value:Number(String(vals[x.id]).replace('，','.'))}));if(!rows.length){toast('还没有记任何人');return}
+ const bad=rows.find(r=>!(Number.isFinite(r.value)&&r.value>=0));if(bad){toast(`${s.students.find(x=>x.id===bad.id).name} 的成绩不对`);return}
+ enqueue({t:'practice',item:c.name,unit:c.unit,rows,note:'自定义项目'});cv[c.name]={};cvSave();beep(1200,.06,.25);vibe(30);toast(`已保存 ${rows.length} 人${online()?'':'，有信号后自动传到电脑'}`);draw()}
+function itemAdd(){$('pick').innerHTML=`<p style="margin:0 0 8px;font-weight:700">添加自定义项目</p><input id="inName" placeholder="项目名称，如：运球绕杆" maxlength="20"><div class="chips" id="inUnits">${['次','个','秒','米','厘米','分'].map((u,i)=>`<button class="${i?'':'on'}" onclick="[...this.parentNode.children].forEach(b=>b.classList.remove('on'));this.classList.add('on');$('inLower').checked=this.textContent==='秒'">${u}</button>`).join('')}</div>
+ <label style="display:flex;gap:8px;align-items:center;margin:4px 0 10px"><input type="checkbox" id="inLower" style="width:auto">越少越好（计时类，比如跑步）</label><button class="sub" onclick="itemSave()">添加</button>`;$('dlg').showModal();setTimeout(()=>$('inName').focus(),50)}
+function itemSave(){const name=$('inName').value.trim().slice(0,20),unit=$('inUnits').querySelector('.on')?.textContent||'次',lower=$('inLower').checked;if(!name){toast('先写项目名称');return}
+ if(custom().some(c=>c.name===name)||S().metrics.some(([,l])=>l===name)){toast('已经有这个项目了');return}
+ D.session&&(D.session.custom=[...custom(),{name,unit,lower}]);persist();enqueue({t:'item',op:'add',name,unit,lower});$('dlg').close();scoreKey='c:'+name;draw();toast('已添加'+(online()?'，电脑上也有了':'，连上电脑后同步'))}
+function itemDel(){const c=custom().find(x=>'c:'+x.name===scoreKey);if(!c||!confirm(`删除「${c.name}」这个项目？已经保存的成绩会保留在电脑上。`))return;D.session.custom=custom().filter(x=>x!==c);persist();enqueue({t:'item',op:'del',name:c.name});scoreKey='';draw()}
+// ======== 课堂练习 ========
+let pr={item:'',unit:'次',vals:{},note:''};try{Object.assign(pr,JSON.parse(localStorage.getItem(LS+'-pr'))||{})}catch{}
+const prSave=()=>{try{localStorage.setItem(LS+'-pr',JSON.stringify(pr))}catch{}};
+function practice(){const s=S();if(!s.students.length){$('app').innerHTML='<div class="card empty">先点右上角选一个班级</div>';return}
+ const sug=[...new Set([...custom().map(c=>c.name),...(s.items||[]),'1分钟跳绳','仰卧起坐','立定跳远','50米跑','坐位体前屈','投掷','运球绕杆','往返跑'])].slice(0,12),n=s.students.filter(x=>pr.vals[x.id]!==undefined&&pr.vals[x.id]!=='').length;
+ $('app').innerHTML=`<section class="card"><input id="pitem" placeholder="练习内容，如：1分钟跳绳" value="${esc(pr.item)}" oninput="pr.item=this.value;prSave()"><div class="chips">${sug.map(x=>`<button class="${x===pr.item?'on':''}" onclick="pr.item='${esc(x)}';pr.unit=/跑/.test(pr.item)?'秒':/跳远|前屈|投/.test(pr.item)?(/前屈/.test(pr.item)?'厘米':'米'):'次';prSave();draw()">${esc(x)}</button>`).join('')}</div>
+ <div class="chips">单位：${['次','个','秒','米','厘米','分'].map(u=>`<button class="${u===pr.unit?'on':''}" onclick="pr.unit='${u}';prSave();draw()">${u}</button>`).join('')}</div>
+ <input id="pnote" placeholder="备注（可不填），如：第二次练习、分组比赛" value="${esc(pr.note)}" oninput="pr.note=this.value;prSave()" style="margin-top:4px"></section>
+ <p class="muted" style="margin:4px 0">已记 ${n}/${s.students.length} 人，没来或没练的空着就行</p>
+ <div class="list">${s.students.map((x,i)=>`<div class="item ${pr.vals[x.id]!==undefined&&pr.vals[x.id]!==''?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)}</small></div><input inputmode="decimal" id="p${i}" placeholder="${esc(pr.unit)}" value="${esc(pr.vals[x.id]??'')}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('p${i+1}')?.focus()}" onchange="pr.vals['${x.id}']=this.value.trim();prSave();this.closest('.item').classList.toggle('ok',!!this.value.trim())"></div>`).join('')}</div>
+ <button class="sub" style="width:100%;margin-top:14px" onclick="practiceSend()">保存这次练习（${n} 人）</button>`}
+function practiceSend(){const s=S(),item=pr.item.trim();if(!item){toast('先写练习内容');$('pitem').focus();return}
+ const rows=s.students.filter(x=>pr.vals[x.id]!==undefined&&pr.vals[x.id]!=='').map(x=>({id:x.id,value:Number(String(pr.vals[x.id]).replace('，','.'))}));if(!rows.length){toast('还没有记任何人');return}
+ const bad=rows.find(r=>!(Number.isFinite(r.value)&&r.value>=0));if(bad){toast(`${s.students.find(x=>x.id===bad.id).name} 的成绩不对`);return}
+ enqueue({t:'practice',item:item.slice(0,30),unit:pr.unit,rows,note:pr.note.trim().slice(0,200)});pr.vals={};pr.note='';prSave();beep(1200,.06,.25);vibe(30);toast(`已保存 ${rows.length} 人${online()?'':'，有信号后自动传到电脑'}`);draw()}
+// ======== 拍视频：手机上录、存在手机里，分块加密传到电脑；传完才删 ========
+const CHUNK=32*1024,MAXV=40*1024*1024;let vids=[],camStream=null,recorder=null,recBits=[],recT0=0,recTimer=0,vidTitle='';
+const idb=()=>new Promise((ok,bad)=>{const r=indexedDB.open('pe-assistant-videos',1);r.onupgradeneeded=()=>r.result.createObjectStore('v',{keyPath:'vid'});r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error)});
+async function vstore(op,val){const db=await idb();return new Promise((ok,bad)=>{const tx=db.transaction('v',op==='get'||op==='all'?'readonly':'readwrite'),st=tx.objectStore('v');const r=op==='all'?st.getAll():op==='put'?st.put(val):op==='del'?st.delete(val):st.get(val);r.onsuccess=()=>ok(r.result);r.onerror=()=>bad(r.error)})}
+async function vidLoad(){try{const all=await vstore('all');vids=all.map(v=>({vid:v.vid,title:v.title,size:v.blob.size,n:Math.ceil(v.blob.size/CHUNK),mime:v.mime,acked:new Set(),done:false,time:v.time}));vidPump()}catch{}}
+function video(){const pend=vids.filter(v=>!v.done),fin=vids.filter(v=>v.done);
+ $('app').innerHTML=`<section class="card">${camStream?`<video id="cam" class="cam" playsinline muted autoplay></video>${recorder?`<div class="rec"><i></i><span id="rect">0:00</span> / 1:00</div><button class="start stop" onclick="recStop()">停止录像</button>`:`<input id="vt" placeholder="视频标题，如：张三 立定跳远" value="${esc(vidTitle)}" oninput="vidTitle=this.value" style="margin:10px 0"><div class="row2" style="margin-top:0"><button class="start" onclick="recStart()">● 开始录像</button><button class="ghost" style="flex:0 0 80px" onclick="stopCam();draw()">关闭</button></div>`}`
+  :`<button class="start" onclick="openCam()">打开相机录像</button><button class="ghost" style="width:100%;margin-top:10px" onclick="$('vf').click()">从相册选一个视频</button><input id="vf" type="file" accept="video/*" hidden onchange="vidPick(this.files[0]);this.value=''">
+  <p class="muted" style="margin:10px 0 0">最长 1 分钟，会自动压缩。传到电脑「文稿 / 体育工作台视频」文件夹，在「视频动作分析」里能直接打开慢放。没信号时先存在手机里。</p>`}</section>
+ ${vids.length?`<section class="card"><h2>传输</h2>${[...pend,...fin.slice(-6)].map(v=>`<div class="vrow"><div style="flex:1;min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.title)}</b><span class="muted">${(v.size/1048576).toFixed(1)} MB · ${v.done?'✓ 已传到电脑':online()?`正在传 ${Math.round(v.acked.size/v.n*100)}%`:'等连上电脑'}</span>${v.done?'':`<div class="bar"><i style="width:${v.acked.size/v.n*100}%"></i></div>`}</div>${v.done?'':`<button class="ghost" style="padding:8px 10px;font-size:13px" onclick="vidDel('${v.vid}')">删除</button>`}</div>`).join('')}</section>`:''}`;
+ const c=$('cam');if(c&&camStream)c.srcObject=camStream}
+async function openCam(){try{camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:960},height:{ideal:720},frameRate:{ideal:30}},audio:true})}catch{try{camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})}catch{toast('打不开相机，请在手机设置里允许使用相机和麦克风');return}}draw()}
+function stopCam(){if(recorder)recStop();camStream?.getTracks().forEach(t=>t.stop());camStream=null}
+function recStart(){if(!window.MediaRecorder){toast('这个手机不支持在 App 里录像，请用「从相册选」');return}
+ const type=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported?.(t))||'';
+ try{recorder=new MediaRecorder(camStream,{...(type?{mimeType:type}:{}),videoBitsPerSecond:1000000,audioBitsPerSecond:48000})}catch{recorder=new MediaRecorder(camStream)}
+ recBits=[];recorder.ondataavailable=e=>{if(e.data.size)recBits.push(e.data)};recorder.onstop=()=>{const blob=new Blob(recBits,{type:recorder?.mimeType||type||'video/webm'});recorder=null;clearInterval(recTimer);vidAdd(blob,vidTitle.trim()||'课堂视频');draw()};
+ recorder.start(1000);recT0=Date.now();beep(1000,.08);vibe(40);draw();recTimer=setInterval(()=>{const s=Math.floor((Date.now()-recT0)/1000),e=$('rect');if(e)e.textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;if(s>=60)recStop()},250)}
+function recStop(){if(recorder&&recorder.state!=='inactive'){recorder.stop();beep(700,.1)}}
+function vidPick(f){if(!f)return;if(f.size>MAXV){toast('视频太大（超过 40MB），请剪短一点再选');return}if(f.size>8*1048576)toast('视频比较大，传到电脑要几分钟');vidAdd(f,vidTitle.trim()||f.name.replace(/\.[^.]+$/,'').slice(0,40)||'课堂视频')}
+async function vidAdd(blob,title){if(blob.size>MAXV){toast('视频太大了');return}const v={vid:mid(),title:title.slice(0,40),blob,mime:blob.type||'video/mp4',time:Date.now()};
+ try{await vstore('put',v)}catch{toast('手机存储空间不够，保存失败');return}vids.push({vid:v.vid,title:v.title,size:blob.size,n:Math.ceil(blob.size/CHUNK),mime:v.mime,acked:new Set(),done:false,time:v.time});vidTitle='';toast('已保存，正在传到电脑');vidPump();draw()}
+async function vidDel(vid){if(!confirm('删除这个还没传完的视频？'))return;await vstore('del',vid).catch(()=>{});vids=vids.filter(v=>v.vid!==vid);draw()}
+// 一次传一个视频，同时最多 6 块在路上；5 秒没回音的块重发
+let pumpBusy=false,inflight=new Map();
+async function vidPump(){if(pumpBusy)return;pumpBusy=true;try{for(;;){const v=vids.find(x=>!x.done);if(!v||!room?.up||!online())break;const rec=await vstore('get',v.vid);if(!rec){vids=vids.filter(x=>x!==v);continue}
+ const now=Date.now();let sent=0;for(let i=0;i<v.n&&inflight.size<6;i++){if(v.acked.has(i))continue;const k=v.vid+':'+i,f=inflight.get(k);if(f&&now-f<5000)continue;
+  const buf=new Uint8Array(await rec.blob.slice(i*CHUNK,(i+1)*CHUNK).arrayBuffer());let b='';for(let j=0;j<buf.length;j+=8192)b+=String.fromCharCode(...buf.subarray(j,j+8192));
+  inflight.set(k,Date.now());room.send({t:'vc',vid:v.vid,i,n:v.n,mime:v.mime,meta:{title:v.title},d:btoa(b)});sent++}
+ for(const [k,t] of inflight)if(Date.now()-t>5000)inflight.delete(k);
+ await new Promise(r=>setTimeout(r,sent?120:600));if(v.acked.size===v.n&&!v.done)await new Promise(r=>setTimeout(r,1500))}}finally{pumpBusy=false}}
+setInterval(vidPump,3000);
+async function vidMsg(m){const v=vids.find(x=>x.vid===m.vid);if(!v)return;
+ if(m.t==='vok'){v.acked.add(m.i);inflight.delete(m.vid+':'+m.i);vidPump()}
+ else if(m.t==='vdone'){v.done=true;v.acked=new Set(Array.from({length:v.n},(_,i)=>i));await vstore('del',v.vid).catch(()=>{});toast(`「${v.title}」已传到电脑`);vibe(40)}
+ if(tab==='video'&&!camStream){const now=Date.now();if(!vidMsg.t||now-vidMsg.t>400||m.t==='vdone'){vidMsg.t=now;draw()}}}
+// ======== 页面 ========
+function draw(soft){head();nav();if(!D.room){welcome();return}
+ if(soft&&document.activeElement?.tagName==='INPUT')return; // 正在输入时不打断
+ ({today,timer,score,practice,video})[tab]()}
+// 安卓 App 的返回键
+window.appBack=()=>{if($('scan')){scanStop();return true}if($('dlg').open){$('dlg').close();return true}if(tab!=='today'&&!running&&!cdEnd){go('today');return true}return false};
+document.addEventListener('click',()=>{try{navigator.wakeLock?.request('screen').catch(()=>{})}catch{}},{once:true});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(D.room&&!room)connect();else room?.send({t:'hello'});draw(true)}});
+setInterval(()=>{if(tab==='today'&&D.room&&!document.hidden&&document.activeElement?.tagName!=='INPUT'&&!$('dlg').open)today()},60000);
+// 网页版（iPhone 添加到主屏幕）：网址里带着连接码就直接配对，然后把它从地址栏去掉
+// iPhone 在 Safari 里先别去掉 # 后面的连接码：这样「添加到主屏幕」以后，桌面图标打开就自动连上
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||/androidplatform/.test(location.host);
+const href=location.href;if(parseLink(href)){if(standalone)history.replaceState(null,'',location.pathname);pair(href)}else{overlay();connect();draw()}
+vidLoad();
+if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>

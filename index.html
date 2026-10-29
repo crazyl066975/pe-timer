@@ -46,7 +46,7 @@ textarea{min-height:70px}
 .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;background:#ffffff22;margin-left:6px;vertical-align:2px}
 .lesson{white-space:pre-wrap;font-size:15px;line-height:1.7;background:#0f1a30;border-radius:14px;padding:12px;margin-top:10px;-webkit-user-select:text;user-select:text}
 .week{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}.week th,.week td{border:1px solid var(--line);padding:4px;vertical-align:top;word-break:break-all}.week th{color:var(--muted);font-weight:500}.week td.today{background:#17345a}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);background:#0d1629ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 6px max(6px,env(safe-area-inset-bottom));z-index:5}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(6,1fr);background:#0d1629ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 6px max(6px,env(safe-area-inset-bottom));z-index:5}
 nav[hidden]{display:none}
 nav button{background:none;display:grid;justify-items:center;gap:1px;padding:6px 0;font-size:12px;color:var(--muted)}nav button i{font-style:normal;font-size:21px;line-height:1.1}nav button.on{color:#fff}nav button.on i{color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#000d;padding:10px 18px;border-radius:99px;font-size:15px;display:none;z-index:9;max-width:90vw;text-align:center}
@@ -60,6 +60,13 @@ nav button{background:none;display:grid;justify-items:center;gap:1px;padding:6px
 dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:18px;width:min(92vw,420px);padding:16px}dialog::backdrop{background:#0009}
 .pick{display:grid;gap:6px;max-height:60vh;overflow:auto}.pick button{padding:12px;text-align:left}
 .empty{text-align:center;color:var(--muted);padding:26px 6px}
+.chat{display:grid;gap:10px;margin-bottom:12px}
+.bub{max-width:88%;padding:10px 12px;border-radius:16px;white-space:pre-wrap;line-height:1.65;font-size:15px;-webkit-user-select:text;user-select:text;word-break:break-word}
+.bub.me{justify-self:end;background:var(--primary);color:#fff;border-bottom-right-radius:6px}
+.bub.ai{justify-self:start;background:var(--card2);border-bottom-left-radius:6px}.bub.err{background:#3a2030;color:#ffb3c0}
+.bub .cp{display:block;margin-top:8px;padding:4px 10px;font-size:12px;background:#ffffff14;border-radius:8px}
+.think{color:var(--muted)}.think::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:8px;animation:bl 1s infinite}
+.askbox{display:flex;gap:8px;align-items:stretch;margin-top:6px}.askbox textarea{min-height:54px;resize:none;flex:1}.askbox .start{flex:0 0 auto;white-space:nowrap}
 </style></head><body>
 <header id="head"></header>
 <main id="app"></main>
@@ -95,6 +102,8 @@ async function connect(){room?.close();room=null;if(!D.room)return;
 function onMsg(m){lastPong=Date.now();
  if(m.t==='session'){const had=!!D.session;D.session=m;delete m.t;persist();if(!had)toast('课表和名单已同步');overlay();draw()}
  else if(m.t==='pong'){}
+ else if(m.t==='aiwait'){const r=aiReq[m.mid];if(r){r.wait=true;r.last=Date.now()}}
+ else if(m.t==='ack'&&aiReq[m.mid])aiDone(m);
  else if(m.t==='ack'){const q=D.queue.find(x=>x.mid===m.mid);D.queue=D.queue.filter(x=>x.mid!==m.mid);persist();if(q&&!m.ok){toast(m.reason||'电脑没收下');if(q.t==='score')delete D.done[q.id+'|'+q.metric]}if(q?.t==='score'&&m.ok){const s=S().students.find(x=>x.id===q.id);if(s){if(m.value==='')delete s.sc[q.metric];else s.sc[q.metric]=m.value}}draw(true)}
  else if(m.t==='vok'||m.t==='vdone')vidMsg(m);
  else if(m.t==='bye'){room?.close();room=null;D.ended=[...(D.ended||[]),D.room].slice(-10);D.room='';D.key='';D.queue=[];persist();toast('电脑那边结束了连接，需要时重新扫码');draw()}
@@ -110,8 +119,8 @@ const pendingOf=(s,k)=>D.queue.some(q=>q.t==='score'&&q.id===s.id&&q.metric===k)
 function sendScore(s,k,v){D.done[s.id+'|'+k]=v;enqueue({t:'score',id:s.id,metric:k,value:v});beep(1200,.06,.25);vibe(30)}
 // ======== 顶部和底部 ========
 function head(){if(!D.room){$('head').innerHTML='';return}const s=S(),n=D.queue.length+vids.filter(v=>!v.done).length;
- $('head').innerHTML=`<div><h1>${tab==='today'?'今天的课':{timer:'计时',score:'记成绩',practice:'课堂练习',video:'拍视频'}[tab]}</h1><div class="st"><span class="dot ${online()?'on':room?.up?'wait':''}"></span>${online()?'已连上电脑':room?.up?'电脑没开或没联网':'手机没网'}${n?` · ${n} 条待传`:''}</div></div>${tab==='today'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="moreMenu()">⋯</button>':`<button class="ghost" style="padding:9px 12px;font-size:14px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="pickClass()">${esc(s.className||'选择班级')} ▾</button>`}`}
-const TABS=[['today','▦','今天'],['timer','⏱','计时'],['score','✎','成绩'],['practice','↻','练习'],['video','●','视频']];
+ $('head').innerHTML=`<div><h1>${tab==='today'?'今天的课':{timer:'计时',score:'记成绩',practice:'课堂练习',video:'拍视频',ai:'AI 助手'}[tab]}</h1><div class="st"><span class="dot ${online()?'on':room?.up?'wait':''}"></span>${online()?'已连上电脑':room?.up?'电脑没开或没联网':'手机没网'}${n?` · ${n} 条待传`:''}</div></div>${tab==='today'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="moreMenu()">⋯</button>':tab==='ai'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="aiClear()">清空</button>':`<button class="ghost" style="padding:9px 12px;font-size:14px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="pickClass()">${esc(s.className||'选择班级')} ▾</button>`}`}
+const TABS=[['today','▦','今天'],['timer','⏱','计时'],['score','✎','成绩'],['practice','↻','练习'],['video','●','视频'],['ai','✨','AI']];
 function nav(){const n=$('nav');n.hidden=!D.room;n.innerHTML=TABS.map(([k,i,l])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')"><i>${i}</i>${l}</button>`).join('')}
 function go(k){if(running||cdEnd){toast('先停止计时再切换');return}stopCam();tab=k;draw();scrollTo(0,0)}
 function pickClass(){const s=S();if(!s.classes.length){toast('电脑上还没有班级');return}
@@ -277,10 +286,42 @@ async function vidMsg(m){const v=vids.find(x=>x.vid===m.vid);if(!v)return;
  if(m.t==='vok'){v.acked.add(m.i);inflight.delete(m.vid+':'+m.i);vidPump()}
  else if(m.t==='vdone'){v.done=true;v.acked=new Set(Array.from({length:v.n},(_,i)=>i));await vstore('del',v.vid).catch(()=>{});toast(`「${v.title}」已传到电脑`);vibe(40)}
  if(tab==='video'&&!camStream){const now=Date.now();if(!vidMsg.t||now-vidMsg.t>400||m.t==='vdone'){vidMsg.t=now;draw()}}}
+// ======== AI 助手：问题经加密通道交给电脑，由电脑用「AI 设置」里的大模型回答（手机上不存密钥）========
+let aiLog=[],aiReq={},aiDraft='';try{aiLog=JSON.parse(localStorage.getItem(LS+'-ai'))||[]}catch{}
+aiLog.forEach(x=>{if(x.pending){delete x.pending;x.err=true;x.content='这条没有收到回答，可以再问一次'}});
+const aiSave=()=>{aiLog=aiLog.slice(-40);try{localStorage.setItem(LS+'-ai',JSON.stringify(aiLog))}catch{}};
+function curCourse(){const p=S().plan||{},d=dayIdx(),now=nowMin();
+ const list=Object.entries(p.week||{}).filter(([k,v])=>+k[0]===d&&v).map(([k,v])=>{const i=+k[2],[a,b]=p.times?.[i]||['',''];return {i,v,a,b}}).filter(c=>c.a&&c.b).sort((x,y)=>x.a.localeCompare(y.a));
+ return list.find(c=>now>=toMin(c.a)&&now<toMin(c.b))||list.find(c=>now<toMin(c.a))||null}
+function aiCtx(){const c=curCourse(),l=c&&lessonFor(c.v);return {course:c?`第${c.i+1}节 ${c.a}–${c.b} ${c.v}`:'',lesson:l?`${l.title}\n${l.text}`.slice(0,1500):''}}
+const aiChatHtml=()=>aiLog.map((x,i)=>`<div class="bub ${x.role==='user'?'me':x.err?'ai err':'ai'}">${x.pending?'<span class="think">AI 正在想…</span>':esc(x.content)}${x.role==='assistant'&&!x.pending&&!x.err?`<button class="cp" onclick="aiCopy(${i})">复制</button>`:''}</div>`).join('');
+function ai(){const c=curCourse(),busy=Object.keys(aiReq).length>0;
+ const chips=(c?[`这节「${c.v}」热身做什么`,`推荐一个和「${c.v}」有关的小游戏`]:[]).concat(['下雨了，这节课怎么改成室内课','学生注意力不集中怎么办','帮我写一段课堂小结','运动中扭伤了怎么处理']);
+ $('app').innerHTML=`${aiLog.length?'':`<div class="card"><b>问 AI</b><p class="muted" style="margin:6px 0 0">用的是电脑上「AI 设置」里的大模型，要连上电脑才能用。学生姓名会换成「某同学」再发出去。${c?`<br>会自动带上这节课：${esc(c.v)}`:''}</p></div>`}
+ <div class="chat" id="aichat">${aiChatHtml()}</div>
+ <div class="chips">${chips.map(q=>`<button data-q="${esc(q)}" onclick="aiSend(this.dataset.q)" ${busy?'disabled':''}>${esc(q)}</button>`).join('')}</div>
+ <div class="askbox"><textarea id="aiq" rows="2" maxlength="1000" placeholder="问点什么，比如：三年级跳绳怎么教" oninput="aiDraft=this.value">${esc(aiDraft)}</textarea><button class="start" style="width:auto;padding:0 18px;font-size:17px" onclick="aiSend($('aiq').value)" ${busy?'disabled':''}>发送</button></div>`;
+ requestAnimationFrame(()=>scrollTo(0,document.body.scrollHeight))}
+function aiSend(text){const q=String(text||'').trim().slice(0,1000);if(!q)return;if(Object.keys(aiReq).length){toast('上一个问题还在回答');return}
+ if(!online()){toast('要连上电脑才能用 AI（用的是电脑上设置好的大模型）');return}
+ const hist=[];for(let i=0;i+1<aiLog.length;i++){const u=aiLog[i],a=aiLog[i+1];if(u.role==='user'&&a.role==='assistant'&&!a.err&&!a.pending&&a.content)hist.push({role:'user',content:u.content.slice(0,1000)},{role:'assistant',content:a.content.slice(0,1500)})}
+ const id=mid();aiLog.push({role:'user',content:q},{role:'assistant',content:'',pending:id});aiSave();aiDraft='';
+ aiReq[id]={msg:{t:'ai',mid:id,messages:[...hist.slice(-8),{role:'user',content:q}],ctx:aiCtx()},t0:Date.now(),last:0,wait:false};aiPump();draw()}
+// 电脑说「正在想」之前每 5 秒重发一次；之后每 20 秒问一下；2 分半还没答就算失败
+function aiPump(){const now=Date.now();for(const [id,r] of Object.entries(aiReq)){if(now-r.t0>150000){aiDone({mid:id,ok:false,reason:'AI 太久没有回应，请稍后再试'});continue}
+ if(room?.up&&now-r.last>(r.wait?20000:5000)){room.send(r.msg);r.last=now}}}
+setInterval(aiPump,2000);
+function aiDone(m){if(!aiReq[m.mid])return;delete aiReq[m.mid];const e=aiLog.find(x=>x.pending===m.mid);
+ if(e){delete e.pending;if(m.ok&&m.text)e.content=m.text;else{e.err=true;const why=m.reason||'AI 没有回答';e.content=/AI 设置/.test(why)?'电脑工作台里：'+why:why}}
+ aiSave();if(m.ok)beep(1100,.06,.2);
+ if(tab!=='ai'){if(m.ok)toast('AI 回答好了，点「AI」查看');return}
+ if(document.activeElement?.id==='aiq'){const c=$('aichat');if(c)c.innerHTML=aiChatHtml();document.querySelectorAll('.chips button,.askbox .start').forEach(b=>b.disabled=false)}else draw()}
+async function aiCopy(i){const t=aiLog[i]?.content||'';try{await navigator.clipboard.writeText(t);toast('已复制')}catch{toast('复制不了，可以长按文字选择复制')}}
+function aiClear(){if(Object.keys(aiReq).length){toast('等这个回答完再清空');return}if(!aiLog.length)return;if(!confirm('清空和 AI 的对话？'))return;aiLog=[];aiSave();draw()}
 // ======== 页面 ========
 function draw(soft){head();nav();if(!D.room){welcome();return}
- if(soft&&document.activeElement?.tagName==='INPUT')return; // 正在输入时不打断
- ({today,timer,score,practice,video})[tab]()}
+ if(soft&&['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return; // 正在输入时不打断
+ ({today,timer,score,practice,video,ai})[tab]()}
 // 安卓 App 的返回键
 window.appBack=()=>{if($('scan')){scanStop();return true}if($('dlg').open){$('dlg').close();return true}if(tab!=='today'&&!running&&!cdEnd){go('today');return true}return false};
 document.addEventListener('click',()=>{try{navigator.wakeLock?.request('screen').catch(()=>{})}catch{}},{once:true});

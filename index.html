@@ -36,6 +36,7 @@ textarea{min-height:70px}
 .item{display:grid;grid-template-columns:1fr 104px;gap:10px;align-items:center;padding:9px 12px;background:var(--card2);border-radius:14px}
 .item.ok{background:#123a2e}.item.wait{background:#3a3415}.item small{color:var(--muted)}
 .item input{padding:9px;font:700 21px var(--num);text-align:center}
+.item.pmrow{grid-template-columns:1fr 150px}.pmw{display:flex;gap:6px}.pmw input{min-width:0}.pm{flex:0 0 42px;font:700 20px var(--num);border-radius:10px;background:#ffffff1a;border:1px solid var(--line)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.chips button{padding:7px 12px;font-size:14px;border-radius:99px}.chips button.on{background:var(--primary);color:#fff}
 .seg{display:flex;background:#0f1a30;border-radius:14px;padding:4px;margin-bottom:12px}.seg button{flex:1;padding:10px 4px;background:none;font-size:15px}.seg button.on{background:var(--primary);color:#fff}
 .course{display:grid;grid-template-columns:62px 1fr;gap:12px;padding:12px;background:var(--card2);border-radius:16px;margin-top:8px;text-align:left;width:100%}
@@ -72,7 +73,8 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS='pe-assistant-v1';
-let D={room:'',key:'',session:null,queue:[],done:{}};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
+{const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
+let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
 let tab='today',room=null,lastPong=0,timerMode='lanes';
 const toast=t=>{const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',2400)};
@@ -87,7 +89,7 @@ const online=()=>!!room?.up&&Date.now()-lastPong<25000;
 function parseLink(txt){try{const h=String(txt).split('#')[1]||'',p=new URLSearchParams(h),r=p.get('r'),k=p.get('k');return PERelay.okRoom(r)&&PERelay.okKey(k)?{room:r,key:k}:null}catch{return null}}
 async function pair(link){const p=parseLink(link);if(!p){toast('这不是工作台的连接码');return false}
  if(D.room&&D.room!==p.room&&D.queue.length&&!confirm(`还有 ${D.queue.length} 条没传到电脑，换电脑后这些会丢掉，确定？`))return false;
- D={room:p.room,key:p.key,session:D.room===p.room?D.session:null,queue:D.room===p.room?D.queue:[],done:{}};persist();await connect();tab='today';draw();toast('已连接，正在同步课表…');if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))setTimeout(()=>toast('点下方「分享」→「添加到主屏幕」，以后像 App 一样打开'),3500);return true}
+ D={room:p.room,key:p.key,session:D.room===p.room?D.session:null,queue:D.room===p.room?D.queue:[],done:D.room===p.room?D.done:{},ended:(D.ended||[]).filter(r=>r!==p.room)};persist();await connect();tab='today';draw();toast('已连接，正在同步课表…');if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))setTimeout(()=>toast('点下方「分享」→「添加到主屏幕」，以后像 App 一样打开'),3500);return true}
 async function connect(){room?.close();room=null;if(!D.room)return;
  try{room=await PERelay.openRoom({room:D.room,key:D.key,side:'phone',onMsg,onState:up=>{if(up){room.send({t:'hello'});flush()}head()}})}catch(e){toast(e.message)}}
 function onMsg(m){lastPong=Date.now();
@@ -95,7 +97,7 @@ function onMsg(m){lastPong=Date.now();
  else if(m.t==='pong'){}
  else if(m.t==='ack'){const q=D.queue.find(x=>x.mid===m.mid);D.queue=D.queue.filter(x=>x.mid!==m.mid);persist();if(q&&!m.ok){toast(m.reason||'电脑没收下');if(q.t==='score')delete D.done[q.id+'|'+q.metric]}if(q?.t==='score'&&m.ok){const s=S().students.find(x=>x.id===q.id);if(s){if(m.value==='')delete s.sc[q.metric];else s.sc[q.metric]=m.value}}draw(true)}
  else if(m.t==='vok'||m.t==='vdone')vidMsg(m);
- else if(m.t==='bye'){room?.close();room=null;D.room='';D.key='';D.queue=[];persist();toast('电脑那边结束了连接，需要时重新扫码');draw()}
+ else if(m.t==='bye'){room?.close();room=null;D.ended=[...(D.ended||[]),D.room].slice(-10);D.room='';D.key='';D.queue=[];persist();toast('电脑那边结束了连接，需要时重新扫码');draw()}
  head()}
 // 没收到回复的，每 4 秒重发一次；手机没信号时攒着，等有信号再发
 function flush(){if(!room?.up)return;for(const q of D.queue.slice(0,20))room.send(q)}
@@ -116,7 +118,7 @@ function pickClass(){const s=S();if(!s.classes.length){toast('电脑上还没有
  $('pick').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">换成哪个班？</p>${s.classes.map(c=>`<button onclick="setClass('${encodeURIComponent(c)}')">${esc(c)}${c===s.className?' ✓':''}</button>`).join('')}`;$('dlg').showModal()}
 function setClass(c){c=decodeURIComponent(c);$('dlg').close();if(c===S().className)return;if(!online()){toast('换班要连上电脑才行');return}lanes=[];enqueue({t:'class',name:c});toast('正在换成 '+c+'…')}
 function moreMenu(){$('pick').innerHTML=`<button onclick="dlg.close();scanStart()">重新扫码（换电脑）</button><button onclick="dlg.close();room?.send({t:'hello'});toast('正在同步…')">立即同步</button><button onclick="dlg.close();unpair()">断开这台电脑</button>`;$('dlg').showModal()}
-function unpair(){if(D.queue.length&&!confirm(`还有 ${D.queue.length} 条没传到电脑，断开后会丢掉，确定？`))return;room?.close();room=null;D={room:'',key:'',session:null,queue:[],done:{}};persist();draw()}
+function unpair(){if(D.queue.length&&!confirm(`还有 ${D.queue.length} 条没传到电脑，断开后会丢掉，确定？`))return;room?.close();room=null;D={room:'',key:'',session:null,queue:[],done:{},ended:[...(D.ended||[]),D.room].slice(-10)};persist();draw()}
 // ======== 欢迎页 + 扫码 ========
 function welcome(){$('app').innerHTML=`<div class="welcome"><img class="logo" src="icon-192.png" alt=""><h1>体育助手</h1><p class="muted">和电脑上的「体育教师工作台」配对后，<br>打开就能看今天的课，计时、成绩、视频直接传到电脑。</p>
  <button class="start" style="margin-top:26px" onclick="scanStart()">扫码连接电脑</button>
@@ -186,10 +188,10 @@ function renderCd(seg){const left=cdEnd?Math.max(0,cdEnd-Date.now()):cdLen*1000;
  <button class="start ${cdEnd?'stop':''}" onclick="${cdEnd?'stopCd()':'startCd()'}">${cdEnd?'停止':'开始（鸣哨）'}</button><p class="muted" style="text-align:center">跳绳、仰卧起坐、练习轮换都能用。最后 3 秒滴滴提示，到点长哨。<br>时间到后去「成绩」或「练习」里输入次数。</p></section>`}
 function startCd(){ctx();whistle(.5);vibe(80);cdEnd=Date.now()+cdLen*1000;draw();let last=null;clearInterval(cdTimer);cdTimer=setInterval(()=>{const left=cdEnd-Date.now(),s=Math.ceil(left/1000),c=$('clock');if(c)c.innerHTML=`${Math.max(0,s)}<small> 秒</small>`;if(s<=3&&s>0&&last!==s){last=s;beep(880,.12)}if(left<=0){clearInterval(cdTimer);cdEnd=0;whistle(1.1);vibe([200,100,200]);toast('时间到！');draw()}},100)}
 function stopCd(){clearInterval(cdTimer);cdEnd=0;draw()}
-function renderSw(seg){$('app').innerHTML=`${seg}<section class="card"><div class="clock" id="clock">${running?'':fmt(swLaps.at(-1)||0)}<small> 秒</small></div><div class="row2" style="margin-top:0"><button class="start ${running?'stop':''}" onclick="${running?'swStop()':'swStart()'}">${running?'停止':'开始'}</button>${running?'<button class="ghost" style="font-size:20px" onclick="swLap()">计次</button>':swLaps.length?'<button class="ghost" onclick="swLaps=[];draw()">清零</button>':''}</div>
+function renderSw(seg){$('app').innerHTML=`${seg}<section class="card"><div class="clock" id="clock">${running?'':fmt(swLaps[swLaps.length-1]||0)}<small> 秒</small></div><div class="row2" style="margin-top:0"><button class="start ${running?'stop':''}" onclick="${running?'swStop()':'swStart()'}">${running?'停止':'开始'}</button>${running?'<button class="ghost" style="font-size:20px" onclick="swLap()">计次</button>':swLaps.length?'<button class="ghost" onclick="swLaps=[];draw()">清零</button>':''}</div>
  <div class="list">${swLaps.map((t,i)=>`<div class="item" style="grid-template-columns:1fr auto"><span>第 ${i+1} 次</span><strong style="font:700 20px var(--num)">${fmt(t)} 秒</strong></div>`).reverse().join('')}</div></section>`}
-function swStart(){ctx();beep(1000,.08);t0=performance.now()-(swLaps.at(-1)||0);swLaps=[];running=true;draw();tick()}
-function swLap(){swLaps.push(performance.now()-t0);beep(1500,.05,.3);vibe(30);const l=$('app').querySelector('.list');if(l)l.insertAdjacentHTML('afterbegin',`<div class="item" style="grid-template-columns:1fr auto"><span>第 ${swLaps.length} 次</span><strong style="font:700 20px var(--num)">${fmt(swLaps.at(-1))} 秒</strong></div>`)}
+function swStart(){ctx();beep(1000,.08);t0=performance.now()-(swLaps[swLaps.length-1]||0);swLaps=[];running=true;draw();tick()}
+function swLap(){swLaps.push(performance.now()-t0);beep(1500,.05,.3);vibe(30);const l=$('app').querySelector('.list');if(l)l.insertAdjacentHTML('afterbegin',`<div class="item" style="grid-template-columns:1fr auto"><span>第 ${swLaps.length} 次</span><strong style="font:700 20px var(--num)">${fmt(swLaps[swLaps.length-1])} 秒</strong></div>`)}
 function swStop(){swLaps.push(performance.now()-t0);running=false;cancelAnimationFrame(raf);draw()}
 // ======== 记成绩（体测项目） ========
 let scoreKey='';
@@ -202,16 +204,17 @@ function score(){const s=S();if(!s.students.length){$('app').innerHTML='<div cla
  if(!scoreKey){$('app').innerHTML=chips;return}
  if(scoreKey.startsWith('c:'))return customScore(chips,cus.find(c=>'c:'+c.name===scoreKey));
  const m=s.metrics.find(([k])=>k===scoreKey),list=s.students.filter(x=>x.req.includes(scoreKey)),done=list.filter(x=>valOf(x,scoreKey)!==undefined).length;
- $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">${esc(m?.[1])}（${esc(m?.[2])}）· 已有 ${done}/${list.length} 人 · 输完一个按回车跳下一个${scoreKey==='reach'?' · 可以填负数':''}</p>
- <div class="list">${list.map((x,i)=>{const v=valOf(x,scoreKey),w=pendingOf(x,scoreKey);return `<div class="item ${w?'wait':v!==undefined?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}${w?' · 待传':''}</small></div><input inputmode="decimal" id="s${i}" placeholder="${esc(m?.[2])}" value="${v??''}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('s${i+1}')?.focus()}" onchange="scoreSave('${x.id}',this)"></div>`}).join('')}</div>`}
+ $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">${esc(m?.[1])}（${esc(m?.[2])}）· 已有 ${done}/${list.length} 人 · 输完自动保存，接着点下一个${scoreKey==='reach'?' · 负数点 ±':''}</p>
+ <div class="list">${list.map((x,i)=>{const v=valOf(x,scoreKey),w=pendingOf(x,scoreKey);return `<div class="item ${w?'wait':v!==undefined?'ok':''}${scoreKey==='reach'?' pmrow':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}${w?' · 待传':''}</small></div>${scoreKey==='reach'?`<span class="pmw"><button class="pm" onclick="pmFlip(${i},'${x.id}')">±</button>`:''}<input inputmode="decimal" enterkeyhint="next" id="s${i}" placeholder="${esc(m?.[2])}" value="${v??''}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('s${i+1}')?.focus()}" onchange="scoreSave('${x.id}',this)">${scoreKey==='reach'?'</span>':''}</div>`}).join('')}</div>`}
+function pmFlip(i,id){const inp=$('s'+i),v=inp.value.trim();if(!v||v==='-'){inp.value=v?'':'-';inp.focus();return}inp.value=v.startsWith('-')?v.slice(1):'-'+v;scoreSave(id,inp)}
 function scoreSave(id,inp){const x=S().students.find(s=>s.id===id),raw=inp.value.trim().replace('，','.');if(raw===''&&valOf(x,scoreKey)===undefined)return;const v=raw===''?'':Number(raw);if(!valid(scoreKey,v)){toast('这个成绩不对，请检查');inp.value=valOf(x,scoreKey)??'';return}
- sendScore(x,scoreKey,v);inp.closest('.item').className='item wait'}
+ sendScore(x,scoreKey,v);inp.closest('.item').classList.remove('ok');inp.closest('.item').classList.add('wait')}
 // 自定义项目：一项一张表，记完点保存，存进电脑「课堂练习」
 let cv={};try{cv=JSON.parse(localStorage.getItem(LS+'-cv'))||{}}catch{}
 const cvSave=()=>{try{localStorage.setItem(LS+'-cv',JSON.stringify(cv))}catch{}};
 function customScore(chips,c){const s=S(),vals=cv[c.name]??={},n=s.students.filter(x=>vals[x.id]).length;
- $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">${esc(c.name)}（${esc(c.unit)}${c.lower?'，越少越好':''}）· 已记 ${n}/${s.students.length} 人 · 没测的空着 <button class="ghost" style="padding:3px 10px;font-size:12px;float:right" onclick="itemDel()">删除项目</button></p>
- <div class="list">${s.students.map((x,i)=>`<div class="item ${vals[x.id]?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}</small></div><input inputmode="decimal" id="c${i}" placeholder="${esc(c.unit)}" value="${esc(vals[x.id]||'')}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('c${i+1}')?.focus()}" onchange="cv[decodeURIComponent('${encodeURIComponent(c.name)}')]['${x.id}']=this.value.trim();cvSave();this.closest('.item').classList.toggle('ok',!!this.value.trim())"></div>`).join('')}</div>
+ $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">${esc(c.name)}（${esc(c.unit)}${c.lower?'，越少越好':''}）· 已记 ${n}/${s.students.length} 人 · 没测的空着，输完自动记下 <button class="ghost" style="padding:3px 10px;font-size:12px;float:right" onclick="itemDel()">删除项目</button></p>
+ <div class="list">${s.students.map((x,i)=>`<div class="item ${vals[x.id]?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}</small></div><input inputmode="decimal" enterkeyhint="next" id="c${i}" placeholder="${esc(c.unit)}" value="${esc(vals[x.id]||'')}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('c${i+1}')?.focus()}" onchange="cv[decodeURIComponent('${encodeURIComponent(c.name)}')]['${x.id}']=this.value.trim();cvSave();this.closest('.item').classList.toggle('ok',!!this.value.trim())"></div>`).join('')}</div>
  <button class="sub" style="width:100%;margin-top:14px" onclick="customSend()">保存${esc(c.name)}成绩（${n} 人）</button>`}
 function customSend(){const c=custom().find(x=>'c:'+x.name===scoreKey);if(!c)return;const s=S(),vals=cv[c.name]||{};
  const rows=s.students.filter(x=>vals[x.id]).map(x=>({id:x.id,value:Number(String(vals[x.id]).replace('，','.'))}));if(!rows.length){toast('还没有记任何人');return}
@@ -232,7 +235,7 @@ function practice(){const s=S();if(!s.students.length){$('app').innerHTML='<div 
  <div class="chips">单位：${['次','个','秒','米','厘米','分'].map(u=>`<button class="${u===pr.unit?'on':''}" onclick="pr.unit='${u}';prSave();draw()">${u}</button>`).join('')}</div>
  <input id="pnote" placeholder="备注（可不填），如：第二次练习、分组比赛" value="${esc(pr.note)}" oninput="pr.note=this.value;prSave()" style="margin-top:4px"></section>
  <p class="muted" style="margin:4px 0">已记 ${n}/${s.students.length} 人，没来或没练的空着就行</p>
- <div class="list">${s.students.map((x,i)=>`<div class="item ${pr.vals[x.id]!==undefined&&pr.vals[x.id]!==''?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)}</small></div><input inputmode="decimal" id="p${i}" placeholder="${esc(pr.unit)}" value="${esc(pr.vals[x.id]??'')}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('p${i+1}')?.focus()}" onchange="pr.vals['${x.id}']=this.value.trim();prSave();this.closest('.item').classList.toggle('ok',!!this.value.trim())"></div>`).join('')}</div>
+ <div class="list">${s.students.map((x,i)=>`<div class="item ${pr.vals[x.id]!==undefined&&pr.vals[x.id]!==''?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)}</small></div><input inputmode="decimal" enterkeyhint="next" id="p${i}" placeholder="${esc(pr.unit)}" value="${esc(pr.vals[x.id]??'')}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('p${i+1}')?.focus()}" onchange="pr.vals['${x.id}']=this.value.trim();prSave();this.closest('.item').classList.toggle('ok',!!this.value.trim())"></div>`).join('')}</div>
  <button class="sub" style="width:100%;margin-top:14px" onclick="practiceSend()">保存这次练习（${n} 人）</button>`}
 function practiceSend(){const s=S(),item=pr.item.trim();if(!item){toast('先写练习内容');$('pitem').focus();return}
  const rows=s.students.filter(x=>pr.vals[x.id]!==undefined&&pr.vals[x.id]!=='').map(x=>({id:x.id,value:Number(String(pr.vals[x.id]).replace('，','.'))}));if(!rows.length){toast('还没有记任何人');return}
@@ -286,7 +289,7 @@ setInterval(()=>{if(tab==='today'&&D.room&&!document.hidden&&document.activeElem
 // 网页版（iPhone 添加到主屏幕）：网址里带着连接码就直接配对，然后把它从地址栏去掉
 // iPhone 在 Safari 里先别去掉 # 后面的连接码：这样「添加到主屏幕」以后，桌面图标打开就自动连上
 const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||/androidplatform/.test(location.host);
-const href=location.href;if(parseLink(href)){if(standalone)history.replaceState(null,'',location.pathname);pair(href)}else{overlay();connect();draw()}
+const href=location.href,lk=parseLink(href);if(lk&&(D.ended||[]).includes(lk.room)){history.replaceState(null,'',location.pathname);overlay();connect();draw();if(!D.room)toast('这次连接已经结束，请在电脑上重新开始连接后再扫码')}else if(lk){if(standalone)history.replaceState(null,'',location.pathname);pair(href)}else{overlay();connect();draw()}
 vidLoad();
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>

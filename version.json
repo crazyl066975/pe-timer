@@ -1,0 +1,22 @@
+{
+  "_说明": "电脑版和手机助手都读这个文件来提醒新版本。每次出新版：改 version、date、notes；把网盘的下载链接填进 desktop.win（Windows）、desktop.mac（Mac），两个都没有就填 desktop.page（下载页）；手机新版改 phone.version 和 phone.apk。链接必须以 https:// 开头，空着就只提醒、不显示下载按钮。和手机网页版的 index.html 放在同一层上传。",
+  "version": "2.4.1",
+  "date": "2026-10-30",
+  "notes": [
+    "荣誉档案可以打印了",
+    "打开工作台时会提醒有没有新版本"
+  ],
+  "desktop": {
+    "win": "",
+    "mac": "",
+    "page": ""
+  },
+  "phone": {
+    "version": "1.5",
+    "apk": "",
+    "notes": [
+      "AI 计数：跳绳、仰卧起坐、开合跳、深蹲自动数，成绩直接传到电脑",
+      "有新版本时会提醒"
+    ]
+  }
+}

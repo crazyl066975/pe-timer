@@ -1,0 +1,4 @@
+MediaPipe Tasks Vision 1.2.0（@mediapipe/tasks-vision，来自 npm）
+Pose Landmarker Lite 模型（pose_landmarker_lite.task，来自 storage.googleapis.com/mediapipe-models）
+版权所有 Google LLC，按 Apache License 2.0 授权：https://www.apache.org/licenses/LICENSE-2.0
+这里只放了手机助手「AI 计数」用到的文件：vision_bundle.js、vision_wasm_internal.js/.wasm（SIMD 版）和姿态模型，全部在手机本地运行，不联网。

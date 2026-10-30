@@ -46,7 +46,7 @@ textarea{min-height:70px}
 .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;background:#ffffff22;margin-left:6px;vertical-align:2px}
 .lesson{white-space:pre-wrap;font-size:15px;line-height:1.7;background:#0f1a30;border-radius:14px;padding:12px;margin-top:10px;-webkit-user-select:text;user-select:text}
 .week{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}.week th,.week td{border:1px solid var(--line);padding:4px;vertical-align:top;word-break:break-all}.week th{color:var(--muted);font-weight:500}.week td.today{background:#17345a}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(6,1fr);background:#0d1629ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 6px max(6px,env(safe-area-inset-bottom));z-index:5}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(7,1fr);background:#0d1629ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 6px max(6px,env(safe-area-inset-bottom));z-index:5}
 nav[hidden]{display:none}
 nav button{background:none;display:grid;justify-items:center;gap:1px;padding:6px 0;font-size:12px;color:var(--muted)}nav button i{font-style:normal;font-size:21px;line-height:1.1}nav button.on{color:#fff}nav button.on i{color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#000d;padding:10px 18px;border-radius:99px;font-size:15px;display:none;z-index:9;max-width:90vw;text-align:center}
@@ -68,20 +68,27 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 .bub .cp{display:block;margin-top:8px;padding:4px 10px;font-size:12px;background:#ffffff14;border-radius:8px}
 .think{color:var(--muted)}.think::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:8px;animation:bl 1s infinite}
 .askbox{display:flex;gap:8px;align-items:stretch;margin-top:6px}.askbox textarea{min-height:54px;resize:none;flex:1}.askbox .start{flex:0 0 auto;white-space:nowrap}
+.cntc{width:100%;height:auto;border-radius:16px;background:#000;display:block}
+.cnt-st{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted);margin:8px 2px}
+.cnt-res{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 8px}.cnt-res b{font:700 72px/1 var(--num);min-width:2.2em;text-align:center;font-variant-numeric:tabular-nums}.cnt-res button{width:58px;height:58px;font:700 28px var(--num);border-radius:16px;background:#ffffff1a}
+.cnwho{width:100%;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;margin:4px 0 10px}
+.chk{display:flex;gap:8px;align-items:center;font-size:15px;margin:4px 0}.chk input{width:22px;height:22px;flex:0 0 auto}
 </style></head><body>
 <header id="head"></header>
+<div id="apkUpd" class="card" hidden style="border-color:var(--primary)"></div>
 <main id="app"></main>
 <nav id="nav" hidden></nav>
 <dialog id="dlg"><div class="pick" id="pick"></div><button class="ghost" style="width:100%;margin-top:10px" onclick="dlg.close()">取消</button></dialog>
 <div class="toast" id="toast"></div>
 <button class="upd" id="upd" hidden onclick="location.reload()">有新版本，点这里更新</button>
 <script src="relay.js"></script>
+<script src="counter.js"></script>
 <script src="jsQR.js"></script>
 <script>
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.3';
+const LS='pe-assistant-v1',APP_VER='1.5';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -121,10 +128,10 @@ const pendingOf=(s,k)=>D.queue.some(q=>q.t==='score'&&q.id===s.id&&q.metric===k)
 function sendScore(s,k,v){D.done[s.id+'|'+k]=v;enqueue({t:'score',id:s.id,metric:k,value:v});beep(1200,.06,.25);vibe(30)}
 // ======== 顶部和底部 ========
 function head(){if(!D.room){$('head').innerHTML='';return}const s=S(),n=D.queue.length+vids.filter(v=>!v.done).length;
- $('head').innerHTML=`<div><h1>${tab==='today'?'今天的课':{timer:'计时',score:'记成绩',practice:'课堂练习',video:'拍视频',ai:'AI 助手'}[tab]}</h1><div class="st"><span class="dot ${online()?'on':room?.up?'wait':''}"></span>${online()?'已连上电脑':room?.up?'电脑没开或没联网':'手机没网'}${n?` · ${n} 条待传`:''}</div></div>${tab==='today'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="moreMenu()">⋯</button>':tab==='ai'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="aiClear()">清空</button>':`<button class="ghost" style="padding:9px 12px;font-size:14px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="pickClass()">${esc(s.className||'选择班级')} ▾</button>`}`}
-const TABS=[['today','▦','今天'],['timer','⏱','计时'],['score','✎','成绩'],['practice','↻','练习'],['video','●','视频'],['ai','✨','AI']];
+ $('head').innerHTML=`<div><h1>${tab==='today'?'今天的课':{timer:'计时',score:'记成绩',practice:'课堂练习',count:'AI 计数',video:'拍视频',ai:'AI 助手'}[tab]}</h1><div class="st"><span class="dot ${online()?'on':room?.up?'wait':''}"></span>${online()?'已连上电脑':room?.up?'电脑没开或没联网':'手机没网'}${n?` · ${n} 条待传`:''}</div></div>${tab==='today'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="moreMenu()">⋯</button>':tab==='ai'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="aiClear()">清空</button>':`<button class="ghost" style="padding:9px 12px;font-size:14px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="pickClass()">${esc(s.className||'选择班级')} ▾</button>`}`}
+const TABS=[['today','▦','今天'],['timer','⏱','计时'],['score','✎','成绩'],['practice','↻','练习'],['count','◎','计数'],['video','●','视频'],['ai','✨','AI']];
 function nav(){const n=$('nav');n.hidden=!D.room;n.innerHTML=TABS.map(([k,i,l])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')"><i>${i}</i>${l}</button>`).join('')}
-function go(k){if(running||cdEnd){toast('先停止计时再切换');return}stopCam();tab=k;draw();scrollTo(0,0)}
+function go(k){if(running||cdEnd){toast('先停止计时再切换');return}if(cnBusy()){toast('先结束计数再切换');return}stopCam();if(k!=='count')cnClose();tab=k;draw();scrollTo(0,0)}
 function pickClass(){const s=S();if(!s.classes.length){toast('电脑上还没有班级');return}
  $('pick').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">换成哪个班？</p>${s.classes.map(c=>`<button onclick="setClass('${encodeURIComponent(c)}')">${esc(c)}${c===s.className?' ✓':''}</button>`).join('')}`;$('dlg').showModal()}
 function setClass(c){c=decodeURIComponent(c);$('dlg').close();if(c===S().className)return;if(!online()){toast('换班要连上电脑才行');return}lanes=[];enqueue({t:'class',name:c});toast('正在换成 '+c+'…')}
@@ -272,8 +279,8 @@ function recStart(){if(!window.MediaRecorder){toast('这个手机不支持在 Ap
  recorder.start(1000);recT0=Date.now();beep(1000,.08);vibe(40);draw();recTimer=setInterval(()=>{const s=Math.floor((Date.now()-recT0)/1000),e=$('rect');if(e)e.textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;if(s>=60)recStop()},250)}
 function recStop(){if(recorder&&recorder.state!=='inactive'){recorder.stop();beep(700,.1)}}
 function vidPick(f){if(!f)return;if(f.size>MAXV){toast('视频太大（超过 40MB），请剪短一点再选');return}if(f.size>8*1048576)toast('视频比较大，传到电脑要几分钟');vidAdd(f,vidTitle.trim()||f.name.replace(/\.[^.]+$/,'').slice(0,40)||'课堂视频')}
-async function vidAdd(blob,title){if(blob.size>MAXV){toast('视频太大了');return}const v={vid:mid(),title:title.slice(0,40),blob,mime:blob.type||'video/mp4',time:Date.now()};
- try{await vstore('put',v)}catch{toast('手机存储空间不够，保存失败');return}vids.push({vid:v.vid,title:v.title,size:blob.size,n:Math.ceil(blob.size/CHUNK),mime:v.mime,acked:new Set(),done:false,time:v.time});vidTitle='';toast('已保存，正在传到电脑');vidPump();draw()}
+async function vidAdd(blob,title,quiet){if(!blob.size){toast('视频是空的，没有保存');return}if(blob.size>MAXV){toast('视频太大了');return}const v={vid:mid(),title:title.slice(0,40),blob,mime:blob.type||'video/mp4',time:Date.now()};
+ try{await vstore('put',v)}catch{toast('手机存储空间不够，保存失败');return}vids.push({vid:v.vid,title:v.title,size:blob.size,n:Math.ceil(blob.size/CHUNK),mime:v.mime,acked:new Set(),done:false,time:v.time});vidTitle='';if(!quiet)toast('已保存，正在传到电脑');vidPump();draw()}
 async function vidDel(vid){if(!confirm('删除这个还没传完的视频？'))return;await vstore('del',vid).catch(()=>{});vids=vids.filter(v=>v.vid!==vid);draw()}
 // 一次传一个视频，同时最多 6 块在路上；5 秒没回音的块重发
 let pumpBusy=false,inflight=new Map();
@@ -288,6 +295,109 @@ async function vidMsg(m){const v=vids.find(x=>x.vid===m.vid);if(!v)return;
  if(m.t==='vok'){v.acked.add(m.i);inflight.delete(m.vid+':'+m.i);vidPump()}
  else if(m.t==='vdone'){v.done=true;v.acked=new Set(Array.from({length:v.n},(_,i)=>i));await vstore('del',v.vid).catch(()=>{});toast(`「${v.title}」已传到电脑`);vibe(40)}
  if(tab==='video'&&!camStream){const now=Date.now();if(!vidMsg.t||now-vidMsg.t>400||m.t==='vdone'){vidMsg.t=now;draw()}}}
+// ======== AI 计数：摄像头看学生做动作，自动数跳绳、仰卧起坐、开合跳、深蹲；保存后成绩和带骨架线的视频传到电脑 ========
+// 识别全在手机上做（MediaPipe 姿态模型，打包在 vendor/mediapipe），画面不发给任何服务器；点「保存」后才经加密通道传到配对的电脑。
+// 画面先画到一块常驻的 canvas 上（视频帧 + 骨架 + 次数 + 计时），录像录的就是这块 canvas，所以视频里带着骨架线和计数。
+const CN_DUR=[[30,'30 秒'],[60,'1 分钟'],[0,'不限时']],CN_MAX=180,NUMF='"DIN Alternate","Bahnschrift","Helvetica Neue",sans-serif';
+let cn={act:'rope',dur:60,rec:true,front:false,sid:'',phase:'idle',count:0,adj:0,t0:0,end:0,full:false,err:''};
+try{const o=JSON.parse(localStorage.getItem(LS+'-cn'))||{};for(const k of ['act','dur','rec','front'])if(k in o)cn[k]=o[k];if(!PECount.ACTIONS[cn.act])cn.act='rope'}catch{}
+const cnKeep=()=>{try{localStorage.setItem(LS+'-cn',JSON.stringify({act:cn.act,dur:cn.dur,rec:cn.rec,front:cn.front}))}catch{}};
+let pose=null,poseWait=null,cnStream=null,cnCounter=null,cnRec=null,cnBits=[],cnBlob=null,cnRaf=0,cnTs=0,cnFps=0,cnLm=null,cnHint='',cnTick=0,cnBeepAt=0;
+const cnCanvas=Object.assign(document.createElement('canvas'),{width:480,height:640,className:'cntc'});
+const cnBusy=()=>cn.phase==='cd'||cn.phase==='run';
+const cnAct=()=>PECount.ACTIONS[cn.act];
+const cnStu=()=>S().students.find(s=>s.id===cn.sid)||null;
+const cnItem=()=>(cn.dur?CN_DUR.find(d=>d[0]===cn.dur)[1].replace(' ',''):'')+cnAct().name;
+// 这个年级要测的 1 分钟跳绳、1 分钟仰卧起坐，测满 1 分钟记进体测成绩；其他都记进课堂练习
+const cnMetric=(st,done=cn.phase!=='done'||cn.full)=>{const m=cnAct().metric;return m&&cn.dur===60&&done&&st?.req?.includes(m)?m:''};
+function cnDest(st){const m=cnMetric(st);if(m){const v=valOf(st,m);return `记进体测「${cnItem()}」${v!==undefined&&v!==''?`，已有 ${esc(v)} ${cnAct().unit}`:''}`}return `记进课堂练习「${cnItem()}」${cn.phase==='done'&&cn.dur===60&&!cn.full&&cnMetric(st,true)?'（没满 1 分钟）':''}`}
+function loadJs(src){return new Promise((ok,bad)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>bad(Error('缺少文件 '+src));document.head.append(s)})}
+function poseInit(){if(pose)return Promise.resolve(pose);return poseWait??=(async()=>{const B='vendor/mediapipe/';if(!window.Vision)await loadJs(B+'vision_bundle.js');
+ if(!await Vision.FilesetResolver.isSimdSupported())throw Error('这台手机的系统浏览器内核太旧，用不了 AI 计数。到应用商店更新「Android System WebView」后再试。');
+ const files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'},opt=d=>({baseOptions:{modelAssetPath:B+'pose_landmarker_lite.task',delegate:d},runningMode:'VIDEO',numPoses:1});
+ try{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('GPU'))}catch{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('CPU'))}return pose})().catch(e=>{poseWait=null;throw e})}
+function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div class="card empty">先点右上角选一个班级</div>';return}
+ const a=cnAct(),st=cnStu(),wait=vids.filter(v=>!v.done).length,who=`<button class="ghost cnwho" onclick="cnPick()" ${cnBusy()?'disabled':''}><span>${st?`<b>${esc(st.name)}</b> <small class="muted">学号 ${esc(st.number)}</small>`:'选择学生'}</span><span class="muted" style="font-size:13px;text-align:right">${st?cnDest(st):'▾'}</span></button>`;
+ if(cn.phase==='idle'||cn.phase==='loading'){
+  $('app').innerHTML=`<section class="card"><div class="chips">${Object.entries(PECount.ACTIONS).map(([k,x])=>`<button class="${k===cn.act?'on':''}" onclick="cnSet('act','${k}')">${x.name}</button>`).join('')}</div>
+  <div class="chips">时间：${CN_DUR.map(([d,l])=>`<button class="${d===cn.dur?'on':''}" onclick="cnSet('dur',${d})">${l}</button>`).join('')}</div>${who}
+  <label class="chk"><input type="checkbox" ${cn.rec?'checked':''} onchange="cn.rec=this.checked;cnKeep()">同时录像（带骨架线和计数），保存时一起传到电脑</label>
+  <p class="muted">${esc(a.tip)}</p><button class="start" onclick="cnOpen()" ${cn.phase==='loading'?'disabled':''}>${cn.phase==='loading'?'正在加载 AI 模型…':'打开相机'}</button>
+  ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
+  ${wait?`<p class="muted" style="text-align:center">还有 ${wait} 个视频在传，进度在「视频」里看</p>`:''}`;return}
+ const ctl=cn.phase==='ready'?`<button class="start" onclick="cnStart()">开始（3 秒后鸣哨）</button><div class="row2"><button class="ghost" onclick="cnFlip()">${cn.front?'换后置相机':'换前置相机'}</button><button class="ghost" onclick="cnClose();draw()">关闭相机</button></div>`
+  :cnBusy()?`<button class="start stop" onclick="cnFinish(false)">${cn.phase==='cd'?'取消':'结束'}</button>`
+  :`<div class="cnt-res"><button onclick="cnAdj(-1)">−</button><b>${cn.count+cn.adj}</b><button onclick="cnAdj(1)">＋</button></div><p class="muted" style="text-align:center;margin:0 0 10px">AI 数了 ${cn.count} ${a.unit}${cn.adj?`，老师改了 ${cn.adj>0?'+':''}${cn.adj}`:''}${cn.rec?cnBlob?' · 视频已录好':cnRec?' · 视频还在生成':' · 这次没录上视频':''}</p>
+   ${st?`<button class="sub" style="width:100%" onclick="cnSaveRes()">保存${esc(st.name)}的成绩，传到电脑</button>`:'<p class="muted" style="text-align:center">没选学生，这次只看结果、不保存。</p>'}<div class="row2"><button class="ghost" onclick="cnAgain()">不要了，重测</button></div>`;
+ $('app').innerHTML=`<section class="card" style="padding:10px">${cnBusy()?'':who}<div id="cnbox"></div><div class="cnt-st"><span id="cnhint">${esc(cnHint||a.tip)}</span><span id="cnfps" style="white-space:nowrap">${cnFps?`识别 ${Math.round(cnFps)} 帧/秒`:''}</span></div>${ctl}</section>`;
+ $('cnbox').append(cnCanvas)}
+function cnSet(k,v){if(cnBusy())return;cn[k]=v;cnKeep();draw()}
+function cnPick(){if(cnBusy())return;const m=cnAct().metric,list=S().students;
+ $('pick').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">谁来测${esc(cnItem())}？</p>${list.map(x=>{const v=cn.dur===60&&m&&x.req?.includes(m)?valOf(x,m):undefined;return `<button onclick="cn.sid='${x.id}';dlg.close();draw()">${esc(x.name)} <small style="color:var(--muted)">学号 ${esc(x.number)}${v!==undefined&&v!==''?` · 已有 ${esc(v)}`:''}</small>${x.id===cn.sid?' ✓':''}</button>`}).join('')}<button onclick="cn.sid='';dlg.close();draw()">不选人，只试试（不保存）</button>`;$('dlg').showModal()}
+// 下一位：体测项目跳到还没成绩的人，练习就按名单往下
+function cnNext(){const list=S().students,i=list.findIndex(s=>s.id===cn.sid),m=cn.dur===60?cnAct().metric||'':'';const rest=[...list.slice(i+1),...list.slice(0,Math.max(0,i))];
+ cn.sid=(rest.find(s=>!(m&&s.req?.includes(m)&&valOf(s,m)!==undefined&&valOf(s,m)!==''))||{}).id||''}
+async function cnOpen(){if(cn.phase!=='idle')return;cn.err='';cn.phase='loading';draw();
+ try{await poseInit()}catch(e){cn.phase='idle';cn.err=/内核/.test(e.message)?e.message:'AI 模型没有加载成功（'+e.message+'），关掉 App 再打开试试';draw();return}
+ if(tab!=='count'||cn.phase!=='loading')return;if(!await cnCam()){cn.phase='idle';draw();return}cn.phase='ready';draw();cnLoop()}
+async function cnCam(){cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v={facingMode:cn.front?'user':'environment',width:{ideal:960},height:{ideal:720},frameRate:{ideal:30}};
+ try{cnStream=await navigator.mediaDevices.getUserMedia({video:v,audio:cn.rec})}catch{try{cnStream=await navigator.mediaDevices.getUserMedia({video:v,audio:false})}catch{toast('打不开相机，请在手机设置里允许「体育助手」使用相机');return false}}
+ let el=$('cnsrc');if(!el){el=document.createElement('video');el.id='cnsrc';el.muted=true;el.playsInline=true;el.setAttribute('playsinline','');el.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';document.body.append(el)}
+ el.srcObject=cnStream;try{await el.play()}catch{}return true}
+// 每来一帧：识别、计数、画到 canvas 上；支持的手机按真实帧率走，不支持的大约每秒 30 次。
+// 有的手机对看不见的 video 不给帧回调，半秒没动静就改用 requestAnimationFrame。
+function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCallback' in HTMLVideoElement.prototype,frames=0,fpsT=performance.now(),lastRun=0,lastStep=performance.now();
+ const next=()=>rvfc?v.requestVideoFrameCallback(step):(cnRaf=requestAnimationFrame(step));
+ const dog=setInterval(()=>{if(cnStream!==me){clearInterval(dog);return}if(rvfc&&!document.hidden&&performance.now()-lastStep>600){rvfc=false;next()}},500);
+ const step=(_,meta)=>{if(cnStream!==me||!me||(meta&&!rvfc))return;next();const now=performance.now();lastStep=now;if(!rvfc){if(now-lastRun<30)return;lastRun=now}if(!v.videoWidth||v.readyState<2)return;
+  let lm=null;try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(v,cnTs).landmarks?.[0]||null}catch{}cnLm=lm;frames++;
+  if(cn.phase==='run'){const o=cnCounter.push(lm,now,v.videoWidth/v.videoHeight);cn.count=o.count;cnHint=o.hint||'';if(o.bumped){beep(1500,.035,.18);vibe(15)}}else cnHint=lm?'':'没看到人，让学生站进画面里';
+  if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':'')}
+  const h=$('cnhint');if(h)h.textContent=cnHint||(cn.phase==='run'?'正在数…':cnAct().tip);cnDraw(v)};
+ next()}
+function cnDraw(v){const c=cnCanvas,g=c.getContext('2d'),vw=v.videoWidth,vh=v.videoHeight;
+ if(!cnRec){const k=Math.min(1,720/Math.max(vw,vh)),w=Math.round(vw*k),h=Math.round(vh*k);if(c.width!==w||c.height!==h){c.width=w;c.height=h}}
+ const w=c.width,h=c.height,u=w/100,lm=cnLm,on=p=>p&&(p.visibility??1)>=0.5,now=Date.now();
+ g.save();if(cn.front){g.translate(w,0);g.scale(-1,1)}g.drawImage(v,0,0,w,h);
+ if(lm){g.lineCap='round';g.lineWidth=Math.max(3,u*0.9);g.strokeStyle=cn.phase==='run'?'#22c3ee':'#ffffffb0';g.beginPath();for(const [a,b] of PECount.LINES){if(!on(lm[a])||!on(lm[b]))continue;g.moveTo(lm[a].x*w,lm[a].y*h);g.lineTo(lm[b].x*w,lm[b].y*h)}g.stroke();
+  g.fillStyle='#fbbf24';for(const i of PECount.POINTS){const p=lm[i];if(!on(p))continue;g.beginPath();g.arc(p.x*w,p.y*h,Math.max(3,u*0.9),0,7);g.fill()}}
+ g.restore();
+ // 上面：次数和计时；下面：学生、项目、时间。全都画进画面，录下来的视频里也有
+ const a=cnAct(),st=cnStu(),n=cn.count+(cn.phase==='done'?cn.adj:0);g.textBaseline='middle';g.fillStyle='#0a1222b8';g.fillRect(0,0,w,u*18);g.fillRect(0,h-u*9,w,u*9);
+ g.fillStyle=cn.phase==='run'?'#fff':'#cbd5e1';g.textAlign='left';g.font=`700 ${u*14}px ${NUMF}`;g.fillText(String(n),u*3,u*9.5);const nw=g.measureText(String(n)).width;
+ g.font=`600 ${u*4.4}px sans-serif`;g.fillStyle='#93c5fd';g.fillText(`${a.unit} · ${a.name}`,u*5+nw,u*10.5);
+ let clock='';if(cn.phase==='run'){const left=cn.end-now;clock=cn.dur?fmtS(left):fmtS(now-cn.t0)}else if(cn.phase==='done')clock=cn.full?'时间到':'已结束';else if(cn.phase==='cd')clock='准备';else clock=cn.dur?fmtS(cn.dur*1000):'不限时';
+ g.textAlign='right';g.font=`700 ${u*8}px ${NUMF}`;g.fillStyle=cn.phase==='run'&&cn.dur&&cn.end-now<=3500?'#fbbf24':'#fff';g.fillText(clock,w-u*3,u*9.5);
+ g.textAlign='left';g.font=`500 ${u*3.8}px sans-serif`;g.fillStyle='#e2e8f0';g.fillText(`${st?st.name+' · ':''}${S().className||''}`,u*3,h-u*4.5);
+ g.textAlign='right';g.fillText(`AI 计数 · ${new Date().toLocaleString('zh-CN',{hour12:false,month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}`,w-u*3,h-u*4.5);
+ if(cn.phase==='cd'){const s=Math.max(1,Math.ceil((cn.t0-now)/1000));g.fillStyle='#0a1222a0';g.beginPath();g.arc(w/2,h/2,u*16,0,7);g.fill();g.fillStyle='#fff';g.textAlign='center';g.font=`700 ${u*20}px ${NUMF}`;g.fillText(String(s),w/2,h/2+u)}
+ if(cn.phase==='run'&&cnHint){g.fillStyle='#fb7185';g.textAlign='center';g.font=`600 ${u*5}px sans-serif`;g.fillText(cnHint,w/2,h-u*14)}}
+const fmtS=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
+function cnStart(){if(cn.phase!=='ready')return;ctx();cn.phase='cd';cn.count=0;cn.adj=0;cn.full=false;cnBlob=null;cn.t0=Date.now()+3000;cnBeepAt=0;cnRecStart();clearInterval(cnTick);cnTick=setInterval(cnClock,100);draw()}
+function cnClock(){const now=Date.now();
+ if(cn.phase==='cd'){const s=Math.ceil((cn.t0-now)/1000);if(s>0&&s!==cnBeepAt){cnBeepAt=s;beep(880,.12)}if(now>=cn.t0){cnCounter=PECount.createCounter(cn.act);cn.end=cn.t0+(cn.dur||CN_MAX)*1000;cn.phase='run';cnBeepAt=0;whistle(.5);vibe(80);draw()}}
+ else if(cn.phase==='run'){const left=cn.end-now,s=Math.ceil(left/1000);if(cn.dur&&s<=3&&s>0&&s!==cnBeepAt){cnBeepAt=s;beep(880,.12)}if(left<=0)cnFinish(true)}}
+function cnFinish(timeUp){clearInterval(cnTick);if(cn.phase==='cd'){cnRecStop(true);cn.phase='ready';draw();return}if(cn.phase!=='run')return;
+ cn.phase='done';cn.full=!!timeUp&&!!cn.dur;if(timeUp){whistle(1.1);vibe([200,100,200])}else beep(700,.1);setTimeout(()=>cnRecStop(false),700);draw()}
+function cnRecStart(){cnBits=[];cnRec=null;if(!cn.rec||!window.MediaRecorder||!cnCanvas.captureStream)return;
+ const out=cnCanvas.captureStream(30);cnStream.getAudioTracks().forEach(t=>out.addTrack(t));
+ const type=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported?.(t))||'';
+ try{cnRec=new MediaRecorder(out,{...(type?{mimeType:type}:{}),videoBitsPerSecond:1000000,audioBitsPerSecond:48000})}catch{try{cnRec=new MediaRecorder(out)}catch{cnRec=null;return}}
+ const r=cnRec,bits=cnBits;r.ondataavailable=e=>{if(e.data.size)bits.push(e.data)};r.onstop=()=>{if(r.drop||bits!==cnBits)return;const b=new Blob(bits,{type:r.mimeType||type||'video/webm'});cnBlob=b.size?b:null;if(tab==='count'&&cn.phase==='done')draw()};r.start(1000)}
+function cnRecStop(drop){const r=cnRec;cnRec=null;if(!r||r.state==='inactive')return;r.drop=drop;r.stop()}
+function cnAdj(d){cn.adj=Math.max(-cn.count,cn.adj+d);draw()}
+function cnAgain(){cnRecStop(true);cnBlob=null;cn.phase='ready';cn.count=0;cn.adj=0;draw()}
+function cnSaveRes(){const st=cnStu();if(!st||cn.phase!=='done')return;const a=cnAct(),n=Math.max(0,cn.count+cn.adj),m=cnMetric(st),item=cnItem();
+ if(m){const old=valOf(st,m);if(old!==undefined&&old!==''&&old!==n&&!confirm(`${st.name} 已有 ${old} ${a.unit}，换成这次的 ${n} ${a.unit}？`))return;sendScore(st,m,n)}
+ else enqueue({t:'practice',item,unit:a.unit,rows:[{id:st.id,value:n}],note:['AI 计数',cn.adj?`老师改过 ${cn.adj>0?'+':''}${cn.adj}`:'',cn.dur===60&&!cn.full?'没满 1 分钟':''].filter(Boolean).join('，')});
+ if(cnBlob)vidAdd(cnBlob,`${st.name} ${item} ${n}${a.unit}`,true);
+ if(!m){beep(1200,.06,.25);vibe(30)}toast(`已保存 ${st.name} ${n} ${a.unit}${cnBlob?'，视频正在传':''}${online()?'':'，有信号后自动传到电脑'}`);
+ cnBlob=null;cnNext();cn.phase='ready';cn.count=0;cn.adj=0;draw()}
+function cnFlip(){if(cnBusy())return;cn.front=!cn.front;cnKeep();cnCam().then(ok=>{if(ok)cnLoop();else{cn.phase='idle';draw()}})}
+function cnClose(){cnRecStop(true);clearInterval(cnTick);cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v=$('cnsrc');if(v)v.srcObject=null;cnLm=null;cnHint='';cn.phase='idle'}
+// 切到后台：正在数就按「结束」处理；回来时相机断了就重新打开
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(cnBusy())cnFinish(false);return}
+ if(tab==='count'&&cnStream&&cnStream.getVideoTracks().every(t=>t.readyState==='ended'))cnCam().then(ok=>{if(ok)cnLoop();else{cn.phase='idle';draw()}})});
 // ======== AI 助手：问题经加密通道交给电脑，由电脑用「AI 设置」里的大模型回答（手机上不存密钥）========
 let aiLog=[],aiReq={},aiDraft='';try{aiLog=JSON.parse(localStorage.getItem(LS+'-ai'))||[]}catch{}
 aiLog.forEach(x=>{if(x.pending){delete x.pending;x.err=true;x.content='这条没有收到回答，可以再问一次'}});
@@ -320,12 +430,25 @@ function aiDone(m){if(!aiReq[m.mid])return;delete aiReq[m.mid];const e=aiLog.fin
  if(document.activeElement?.id==='aiq'){const c=$('aichat');if(c)c.innerHTML=aiChatHtml();document.querySelectorAll('.chips button,.askbox .start').forEach(b=>b.disabled=false)}else draw()}
 async function aiCopy(i){const t=aiLog[i]?.content||'';try{await navigator.clipboard.writeText(t);toast('已复制')}catch{toast('复制不了，可以长按文字选择复制')}}
 function aiClear(){if(Object.keys(aiReq).length){toast('等这个回答完再清空');return}if(!aiLog.length)return;if(!confirm('清空和 AI 的对话？'))return;aiLog=[];aiSave();draw()}
+// ======== 安卓 App 的新版本提醒：一天最多读一次 GitHub Pages 上的 version.json（和电脑版用同一份）；网页版自己会更新，不用提醒 ========
+const UPD_URL='https://crazyl066975.github.io/pe-timer/version.json';
+const verNewer=(a,b)=>{const p=v=>/^\d+(\.\d+){0,3}$/.test(String(v??''))?String(v).split('.').map(Number):null,x=p(a),y=p(b);if(!x||!y)return false;for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0}return false};
+const updLoad=()=>{try{return JSON.parse(localStorage.getItem(LS+'-upd'))||{}}catch{return {}}},updKeep=s=>{try{localStorage.setItem(LS+'-upd',JSON.stringify(s))}catch{}};
+function apkUpdShow(s=updLoad()){const el=$('apkUpd');if(!s.v||!verNewer(s.v,APP_VER)||s.skip===s.v){el.hidden=true;return}
+ el.innerHTML=`<b>体育助手有新版本 ${esc(s.v)}</b> <span class="muted">（现在是 ${APP_VER}）</span>${s.notes?.length?`<p class="muted" style="margin:6px 0 0">${s.notes.map(esc).join('；')}</p>`:''}<div class="row2">${s.apk?`<button class="sub" data-u="${esc(s.apk)}" onclick="location.href=this.dataset.u">下载新版</button>`:'<span class="muted" style="align-self:center">找发软件给你的老师要新版本</span>'}<button class="ghost" onclick="apkUpdSkip()">先不更新</button></div>`;el.hidden=false}
+async function apkUpdCheck(){if(!/androidplatform/.test(location.host))return;let s=updLoad();const day=new Date().toLocaleDateString('sv-SE');
+ if(s.day!==day){try{const r=await fetch(UPD_URL+'?t='+Date.now(),{cache:'no-store'});
+  if(r.ok){const p=(await r.json())?.phone||{};s={skip:s.skip,day,v:/^\d+(\.\d+){1,3}$/.test(p.version||'')?p.version:'',apk:/^https:\/\//.test(p.apk||'')?String(p.apk).slice(0,500):'',notes:(Array.isArray(p.notes)?p.notes:[]).slice(0,4).map(n=>String(n).slice(0,60))};updKeep(s)}
+  else if(r.status===404){s={skip:s.skip,day,v:''};updKeep(s)}}catch{}} // 没联网就不记今天查过
+ apkUpdShow(s)}
+function apkUpdSkip(){const s=updLoad();s.skip=s.v;updKeep(s);$('apkUpd').hidden=true}
+setTimeout(apkUpdCheck,4000);
 // ======== 页面 ========
 function draw(soft){head();nav();if(!D.room){welcome();return}
  if(soft&&['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return; // 正在输入时不打断
- ({today,timer,score,practice,video,ai})[tab]()}
+ ({today,timer,score,practice,count:countPage,video,ai})[tab]()}
 // 安卓 App 的返回键
-window.appBack=()=>{if($('scan')){scanStop();return true}if($('dlg').open){$('dlg').close();return true}if(tab!=='today'&&!running&&!cdEnd){go('today');return true}return false};
+window.appBack=()=>{if($('scan')){scanStop();return true}if($('dlg').open){$('dlg').close();return true}if(tab==='count'&&cn.phase!=='idle'){if(cnBusy())toast('先点「结束」');else{cnClose();draw()}return true}if(tab!=='today'&&!running&&!cdEnd){go('today');return true}return false};
 document.addEventListener('click',()=>{try{navigator.wakeLock?.request('screen').catch(()=>{})}catch{}},{once:true});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(D.room&&!room)connect();else room?.send({t:'hello'});draw(true)}});
 setInterval(()=>{if(tab==='today'&&D.room&&!document.hidden&&document.activeElement?.tagName!=='INPUT'&&!$('dlg').open)today()},60000);
@@ -337,7 +460,7 @@ vidLoad();
 // 网页版有新版本时：手边没在用就自动刷新；正在计时、录像、输入时，顶部提示点一下再更新
 function appUpdated(){if(appUpdated.done)return;appUpdated.done=true;
  let recent=false;try{recent=Date.now()-Number(sessionStorage.getItem('pe-reloaded')||0)<30000}catch{}
- const busy=running||cdEnd||recorder||Object.keys(aiReq).length||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||$('dlg').open||$('scan');
+ const busy=running||cdEnd||recorder||(tab==='count'&&cn.phase!=='idle')||Object.keys(aiReq).length||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||$('dlg').open||$('scan');
  if(!busy&&!recent){try{sessionStorage.setItem('pe-reloaded',String(Date.now()))}catch{}location.reload();return}
  $('upd').hidden=false}
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host)){const hadSW=!!navigator.serviceWorker.controller;

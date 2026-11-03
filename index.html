@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.8.1';
+const LS='pe-assistant-v1',APP_VER='1.9';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -303,7 +303,7 @@ async function vidMsg(m){const v=vids.find(x=>x.vid===m.vid);if(!v)return;
  if(m.t==='vok'){v.acked.add(m.i);inflight.delete(m.vid+':'+m.i);vidPump()}
  else if(m.t==='vdone'){v.done=true;v.acked=new Set(Array.from({length:v.n},(_,i)=>i));await vstore('del',v.vid).catch(()=>{});toast(`「${v.title}」已传到电脑`);vibe(40)}
  if(tab==='video'&&!camStream){const now=Date.now();if(!vidMsg.t||now-vidMsg.t>400||m.t==='vdone'){vidMsg.t=now;draw()}}}
-// ======== AI 计数：摄像头看学生做动作，自动数跳绳、仰卧起坐、开合跳、深蹲；保存后成绩和带骨架线的视频传到电脑 ========
+// ======== AI 计数：摄像头看学生做动作，自动数跳绳、仰卧起坐、开合跳、深蹲、颠球、原地运球；保存后成绩和带骨架线的视频传到电脑 ========
 // 识别全在手机上做（MediaPipe 姿态模型，打包在 vendor/mediapipe），画面不发给任何服务器；点「保存」后才经加密通道传到配对的电脑。
 // 画面先画到一块常驻的 canvas 上（视频帧 + 骨架 + 次数 + 计时），录像录的就是这块 canvas，所以视频里带着骨架线和计数。
 const CN_DUR=[[30,'30 秒'],[60,'1 分钟'],[0,'不限时']],CN_MAX=180,NUMF='"DIN Alternate","Bahnschrift","Helvetica Neue",sans-serif';
@@ -327,7 +327,7 @@ function poseInit(){if(pose)return Promise.resolve(pose);return poseWait??=(asyn
 // 交给认人模型前先把画面缩到长边 480（模型自己只看 256×256），手机相机给的画面很大时省下搬运时间
 const cnPoseCv=document.createElement('canvas');
 function cnPoseImg(v){const vw=v.videoWidth,vh=v.videoHeight,k=480/Math.max(vw,vh);if(k>=1)return v;const w=Math.round(vw*k),h=Math.round(vh*k);if(cnPoseCv.width!==w||cnPoseCv.height!==h){cnPoseCv.width=w;cnPoseCv.height=h}cnPoseCv.getContext('2d').drawImage(v,0,0,w,h);return cnPoseCv}
-// 颠球还要认球：认物体模型 EfficientDet-Lite0（半精度版，显卡也能跑），只留「运动用球」，也在手机上跑
+// 颠球、原地运球还要认球：认物体模型 EfficientDet-Lite0（半精度版，显卡也能跑），只留「运动用球」，也在手机上跑
 // 先试显卡（比芯片快：Mac 上 36 毫秒降到 23 毫秒），拿画出来的球试认一下，认不出就改用芯片（有的手机显卡算不对）
 function ballInit(){if(ballDet)return Promise.resolve(ballDet);return ballWait??=(async()=>{await poseInit();const B='vendor/mediapipe/',files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'};
  const make=d=>Vision.ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:B+'efficientdet_lite0_f16.tflite',delegate:d},runningMode:'VIDEO',scoreThreshold:0.2,maxResults:3,categoryAllowlist:['sports ball']});
@@ -353,7 +353,7 @@ function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div
   <div class="chips">时间：${CN_DUR.map(([d,l])=>`<button class="${d===cn.dur?'on':''}" onclick="cnSet('dur',${d})">${l}</button>`).join('')}</div>${who}
   <label class="chk"><input type="checkbox" ${cn.rec?'checked':''} onchange="cn.rec=this.checked;cnKeep()">同时录像（带骨架线和计数），保存时一起传到电脑</label>
   <p class="muted">${esc(a.tip)}</p><button class="start" onclick="cnOpen()" ${cn.phase==='loading'?'disabled':''}>${cn.phase==='loading'?'正在加载 AI 模型…':'打开相机'}</button>
-  ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${a.ball?'颠球还要多加载一个认球模型（约 7MB）。':''}${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
+  ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${a.ball?`${a.name}还要多加载一个认球模型（约 7MB）。`:''}${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
   ${wait?`<p class="muted" style="text-align:center">还有 ${wait} 个视频在传，进度在「视频」里看</p>`:''}`;return}
  const ctl=cn.phase==='ready'?`<button class="start" onclick="cnStart()">开始（3 秒后鸣哨）</button><div class="row2"><button class="ghost" onclick="cnFlip()">${cn.front?'换后置相机':'换前置相机'}</button><button class="ghost" onclick="cnClose();draw()">关闭相机</button></div>`
   :cnBusy()?`<button class="start stop" onclick="cnFinish(false)">${cn.phase==='cd'?'取消':'结束'}</button>`
@@ -380,14 +380,14 @@ function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCall
  const next=()=>rvfc?v.requestVideoFrameCallback(step):(cnRaf=requestAnimationFrame(step));
  const dog=setInterval(()=>{if(cnStream!==me){clearInterval(dog);return}if(rvfc&&!document.hidden&&performance.now()-lastStep>600){rvfc=false;next()}},500);
  const step=(_,meta)=>{if(cnStream!==me||!me||(meta&&!rvfc))return;next();const now=performance.now();lastStep=now;if(!rvfc){if(now-lastRun<30)return;lastRun=now}if(!v.videoWidth||v.readyState<2)return;
-  // 颠球数的是球，人只用来定地面和身高，隔一帧认一次就够，省下的时间多认球；计数用这一帧画面出来的时间，不受认得快慢影响
+  // 颠球、运球数的是球，人只用来定地面、身高和手在哪，隔一帧认一次就够，省下的时间多认球；计数用这一帧画面出来的时间，不受认得快慢影响
   const isBall=cnAct().ball,pt=meta?.presentationTime,ft=cnFt=Math.max(cnFt+1,pt>now-500&&pt<=now?pt:now);let lm=cnLm,balls=[];
   if(!isBall||!lm||now-cnPoseT>=60){lm=null;const a=performance.now();try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(cnPoseImg(v),cnTs).landmarks?.[0]||null}catch{}cnLm=lm;cnPoseT=now;dp+=performance.now()-a;np++}frames++;
   if(isBall&&ballDet){const a=performance.now();try{balls=cnBalls(v,lm)}catch{}db+=performance.now()-a;nb++}
   if(cn.phase==='run'){const o=cnCounter.push(lm,ft,v.videoWidth/v.videoHeight,balls);cn.count=o.count;cnHint=o.hint||'';if(isBall)cnBall=o.ball||null;if(o.bumped){beep(1500,.035,.18);vibe(15)}if(o.ended){toast(`球落地了，这次颠了 ${o.count} 个`);cnFinish(false)}}
   else{cnBall=balls[0]||null;cnHint=!lm?'没看到人，让学生站进画面里':isBall&&!cnBall?'把球放进画面里':''}
   cnTrk=cnBall?[cnBall,cnTrk[0]]:[];
-  if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':cn.act==='juggle'&&cnFps<15?' · 偏慢，可能漏数':'')
+  if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':cnAct().ball&&cnFps<15?' · 偏慢，可能漏数':'')
    // 慢的时候写出慢在哪：相机给的画面多大、每秒几帧，认人、认球各要几毫秒，用的显卡还是芯片（截图发过来就能看出来）
    const g=$('cndiag'),st=me.getVideoTracks()[0]?.getSettings?.()||{};if(g)g.textContent=cnFps<20?`画面 ${v.videoWidth}×${v.videoHeight}${st.frameRate?` ${Math.round(st.frameRate)} 帧`:''} · 认人 ${np?Math.round(dp/np):'-'} 毫秒（${poseDev}）${isBall?` · 认球 ${nb?Math.round(db/nb):'-'} 毫秒（${ballDev}）`:''}`:'';dp=np=db=nb=0}
   const h=$('cnhint');if(h)h.textContent=cnHint||(cn.phase==='run'?'正在数…':cnAct().tip);cnDraw(v)};

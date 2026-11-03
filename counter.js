@@ -1,4 +1,4 @@
-// AI 计数（手机端）：把 MediaPipe 每帧给出的 33 个身体关键点，变成跳绳、仰卧起坐、开合跳、深蹲的次数；颠球还要用页面认出的球。
+// AI 计数（手机端）：把 MediaPipe 每帧给出的 33 个身体关键点，变成跳绳、仰卧起坐、开合跳、深蹲的次数；颠球、原地运球还要用页面认出的球。
 // 只做计算，不碰相机和页面；手机页面和 tests/counter.test.cjs 共用这一份。
 // 坐标先乘上画面宽高比换成同一个尺度，再按躯干长度（肩膀中点到髋部中点）归一化，所以人站远站近、手机横放竖放都能数。
 (function(root){
@@ -7,7 +7,8 @@ const ACTIONS={
  situp:{name:'仰卧起坐',unit:'次',metric:'situp',tip:'手机架在学生侧面，拍到头、腰和膝盖。肩膀碰垫、双肘碰到膝盖才算一个。'},
  jack:{name:'开合跳',unit:'个',tip:'手机放在学生正面，拍到全身。双手要举过头顶才算一个。'},
  squat:{name:'深蹲',unit:'个',tip:'手机放在学生侧面，拍到全身。蹲到大腿接近水平才算一个。'},
- juggle:{name:'颠球',unit:'个',ball:true,tip:'手机放在学生侧前方 3 米外，拍到全身和球，画面里只留一个球。球落地就自动停，建议选「不限时」。'}
+ juggle:{name:'颠球',unit:'个',ball:true,tip:'手机放在学生侧前方 3 米外，拍到全身和球，画面里只留一个球。球落地就自动停，建议选「不限时」。'},
+ dribble:{name:'原地运球',unit:'次',ball:true,tip:'手机放在学生正前方 3 米外，拍到全身和球，旁边别有人运球。球每砸地弹起来一下算一次。'}
 };
 // 画骨架用：肩、臂、躯干、腿、脚
 const LINES=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];
@@ -100,6 +101,55 @@ function juggleCounter(){
    return {count,ok:true,bumped,ball,value:h,hint:started?'':'开始颠球'}},
   reset(){count=0;lastT=scale=ground=h=ext=prev=dropT=fl=sh=null;down=false;extT=dropB=sms=0;hist=[];tl=[];last=-1e9;low=lost=0;started=ended=false}};
 }
+// 原地运球：也用页面认出的球，球高和颠球一样（地面到球底，按躯干长度）。球往下走、到了最低点又抬起来，而且最低点离地近
+// （不到这一下最高点的 45%，至少 0.3），就是砸了一下地，记一次；手拿着球上下晃不算。
+// 球脱手自己在地上弹的不算：这一下球在高处时，离球 REACH 个躯干长以内要有手腕（看不到手腕就不管这条）。
+// 球被身体挡住：短的（不到 G，约 0.8 个运球周期）接着看球的走势；长的（2 秒以内，已经数了 3 下）改看离球最近的那只手腕，
+// 往下按到底又抬起来算一次（上一次数完以后按的那下也补上）。跟着手腕数过以后，球回来的同一下不再数：要隔 0.6 个周期以上。
+// 运球周期 = 最近几下间隔的中位数。门槛是用模拟数据试出来的，还要用真视频再调。
+function dribbleCounter(){
+ const RISE=0.15,FALL=0.15,WAMP=0.12,REACH=1;
+ let count=0,lastT=null,scale=null,ground=null,h=null,down=false,ext=null,extT=0,top=0,touch=true,hist=[],last=-1e9,byHand=false,iv=[],prev=null,seenT=-1e9,wh=null,wdown=false,wext=null,wT=-1e9,wait=[];
+ // wait：上一次数完以后，手腕往下按到底的时刻；球被挡住久了就按这些补数
+ const period=()=>{if(iv.length<2)return 500;const s=[...iv].sort((a,b)=>a-b);return s[s.length>>1]};
+ const hit=(t,hand)=>{if(t-last<1500){iv.push(t-last);if(iv.length>6)iv.shift()}count++;last=t;byHand=hand;wait=[]};
+ // 碰地那下是尖的（V 形）：最低点和前一帧、和后一帧各配一对，按这几下最快的速度 k 从两头往中间延长，交点就是碰地的时刻和高度
+ // （高度 = 两帧平均高度 − k × 间隔 ÷ 2）。帧率低、或者碰地那几帧没认出球，也估得出来；手里拿着球慢慢晃，k 小，估出来不会低。
+ // 两下隔多久按碰地的时刻算，不按认出来的时刻（画面卡的时候前一下认得晚，会和后一下挨得太近）
+ const speed=()=>{let k=0;for(let j=1;j<hist.length;j++){const a=hist[j-1],b=hist[j];if(b.t-a.t<=150)k=Math.max(k,Math.abs(b.h-a.h)/(b.t-a.t))}return Math.min(k,0.012)};
+ function bottom(){const i=hist.findIndex(p=>p.t===extT),k=speed();let o={h:ext,t:extT};
+  for(const [a,b] of [[hist[i-1],hist[i]],[hist[i],hist[i+1]]])if(a&&b&&k){const v=(a.h+b.h)/2-k*(b.t-a.t)/2;if(v<o.h)o={h:v,t:Math.max(a.t,Math.min(b.t,(a.t+b.t)/2+(a.h-b.h)/(2*k)))}}
+  o.h=Math.max(ext-1,o.h);return o}
+ return {kind:'dribble',get count(){return count},
+  push(lm,t,asp=1,balls=[]){const dt=lastT===null?33:t-lastT;lastT=t;let bumped=false;
+   if(lm&&[11,12,23,24].every(i=>seen(lm,i))){const L=len(sub(mid(pt(lm,11,asp),pt(lm,12,asp)),mid(pt(lm,23,asp),pt(lm,24,asp))));if(L)scale=ease(scale,L,dt,600);
+    const f=[27,28,29,30,31,32].filter(i=>seen(lm,i));if(f.length)ground=ease(ground,Math.max(...f.map(i=>lm[i].y)),dt,400)}
+   if(!scale||ground===null)return {count,ok:false,hint:lm?'要拍到全身和脚':'没看到人'};
+   const P=period(),G=Math.max(300,0.8*P);
+   // 跟住同一个球：离上一帧的球最近的；刚开始挑离身体最近的，离身体两个躯干长以外的（旁边同学的球）不要
+   const cx=lm&&seen(lm,23)&&seen(lm,24)?(lm[23].x+lm[24].x)/2*asp:null;
+   const near=(balls||[]).map(b=>[b,prev?Math.hypot((b.x-prev.x)*asp,b.y-prev.y):cx===null?0:Math.abs(b.x*asp-cx)]).sort((a,b)=>a[1]-b[1])[0];
+   const ball=near&&near[1]<scale*(prev?3:2)?near[0]:null,at=ball||prev,gone=ball?0:t-seenT;
+   // 运球的手：离球（看不见就按上一次看到的位置）最近的手腕；往下按到底、抬起 WAMP 就是按了一下
+   const wr=at&&lm?[15,16].filter(i=>seen(lm,i)).map(i=>pt(lm,i,asp)).sort((a,b)=>Math.hypot(a.x-at.x*asp,a.y-at.y)-Math.hypot(b.x-at.x*asp,b.y-at.y))[0]:null;
+   if(wr){wh=ease(wh,(ground-wr.y)/scale,dt,30);
+    if(!wdown){wext=wext===null?wh:Math.max(wext,wh);if(wh<wext-WAMP){wdown=true;wext=wh}}
+    else{if(wh<wext)wext=wh;if(wh>wext+WAMP){wdown=false;wext=wh;if(t-wT>=0.6*P&&t-last>=0.6*P){wait.push(t);wT=t}}}}
+   if(ball)wait=wait.filter(w=>t-w<1.2*P).slice(-1);
+   else if(count>=3&&gone>=G&&gone<=2000)for(const w of wait.splice(0)){hit(w,true);bumped=true}
+   if(!ball){if(gone>2000){prev=null;wait=[]}return {count,ok:false,bumped,hint:count||prev?'看不到球':'把球放进画面里'}}
+   if(t-seenT>=G){down=false;ext=null;hist=[];h=null;touch=true}
+   prev=ball;seenT=t;h=ease(h,(ground-(ball.y+ball.r))/scale,dt,15);hist.push({t,h});if(hist.length>12)hist.shift();
+   const ne=!wr||Math.hypot(ball.x*asp-wr.x,ball.y-wr.y)<=REACH*scale;
+   if(!down){if(ext===null||h>ext)ext=h;if(ne&&h>=ext-0.3)touch=true;if(h<ext-FALL){down=true;top=ext;ext=h;extT=t}}
+   // 抬起 RISE 才算到底；碰地那几帧没认出球时，抬得不够高也行：上一帧还在快速往下掉、这一帧已经比上一帧高，中间肯定砸过地（再按 V 形估一下够不够低）
+   else{if(h<ext){ext=h;extT=t}const [p0,q]=hist.slice(-3,-1),fast=p0&&q&&h>q.h&&(q.h-p0.h)/((q.t-p0.t)||1)<-speed()/4;
+    if(fast||h>ext+RISE){const b=bottom(),low=b.h<=Math.max(0.3,top*0.45);
+     if(low&&touch&&b.t-last>=(byHand?0.6*P:150)){hit(b.t,false);bumped=true}
+     if(low||h>ext+RISE){down=false;ext=h;touch=ne}}}
+   return {count,ok:true,bumped,ball,value:h,hint:count?'':'开始运球'}},
+  reset(){count=0;lastT=scale=ground=h=ext=prev=wh=wext=null;down=wdown=byHand=false;touch=true;extT=top=0;hist=[];iv=[];wait=[];last=seenT=wT=-1e9}};
+}
 const oneSide=pairs=>lm=>{if(!lm)return null;const ids=side(lm,pairs);return ids.every(i=>seen(lm,i))?ids:null};
 const bothSides=ids=>lm=>lm&&ids.every(i=>seen(lm,i))?ids:null;
 const MAKERS={
@@ -110,7 +160,8 @@ const MAKERS={
  jack:()=>angleCounter('jack',{need:bothSides([11,12,15,16,23,24]),measure:(lm,_,asp)=>(angle(pt(lm,23,asp),pt(lm,11,asp),pt(lm,15,asp))+angle(pt(lm,24,asp),pt(lm,12,asp),pt(lm,16,asp)))/2,rest:['<',60],act:['>',130]}),
  // 膝盖夹角（髋-膝-踝）：站直约 175°，蹲到大腿水平约 90°
  squat:()=>angleCounter('squat',{need:oneSide([[23,25,27],[24,26,28]]),measure:(lm,[a,b,c],asp)=>angle(pt(lm,a,asp),pt(lm,b,asp),pt(lm,c,asp)),rest:['>',155],act:['<',110]}),
- juggle:juggleCounter
+ juggle:juggleCounter,
+ dribble:dribbleCounter
 };
 function createCounter(kind){const m=MAKERS[kind];if(!m)throw Error('不认识的项目：'+kind);return m()}
 const api={ACTIONS,LINES,POINTS,angle,createCounter};

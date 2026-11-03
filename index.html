@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.8';
+const LS='pe-assistant-v1',APP_VER='1.8.1';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -310,7 +310,7 @@ const CN_DUR=[[30,'30 秒'],[60,'1 分钟'],[0,'不限时']],CN_MAX=180,NUMF='"D
 let cn={act:'rope',dur:60,rec:true,front:false,sid:'',phase:'idle',count:0,adj:0,t0:0,end:0,full:false,err:''};
 try{const o=JSON.parse(localStorage.getItem(LS+'-cn'))||{};for(const k of ['act','dur','rec','front'])if(k in o)cn[k]=o[k];if(!PECount.ACTIONS[cn.act])cn.act='rope'}catch{}
 const cnKeep=()=>{try{localStorage.setItem(LS+'-cn',JSON.stringify({act:cn.act,dur:cn.dur,rec:cn.rec,front:cn.front}))}catch{}};
-let pose=null,poseWait=null,ballDet=null,ballWait=null,cnStream=null,cnCounter=null,cnRec=null,cnBits=[],cnBlob=null,cnRaf=0,cnTs=0,cnFt=0,cnPoseT=0,cnFps=0,cnLm=null,cnBall=null,cnTrk=[],cnHint='',cnTick=0,cnBeepAt=0;
+let pose=null,poseWait=null,ballDet=null,ballWait=null,poseDev='',ballDev='',cnStream=null,cnCounter=null,cnRec=null,cnBits=[],cnBlob=null,cnRaf=0,cnTs=0,cnFt=0,cnPoseT=0,cnFps=0,cnLm=null,cnBall=null,cnTrk=[],cnHint='',cnTick=0,cnBeepAt=0;
 const cnCanvas=Object.assign(document.createElement('canvas'),{width:480,height:640,className:'cntc'});
 const cnBusy=()=>cn.phase==='cd'||cn.phase==='run';
 const cnAct=()=>PECount.ACTIONS[cn.act];
@@ -323,13 +323,16 @@ function loadJs(src){return new Promise((ok,bad)=>{const s=document.createElemen
 function poseInit(){if(pose)return Promise.resolve(pose);return poseWait??=(async()=>{const B='vendor/mediapipe/';if(!window.Vision)await loadJs(B+'vision_bundle.js');
  if(!await Vision.FilesetResolver.isSimdSupported())throw Error('这台手机的系统浏览器内核太旧，用不了 AI 计数。到应用商店更新「Android System WebView」后再试。');
  const files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'},opt=d=>({baseOptions:{modelAssetPath:B+'pose_landmarker_lite.task',delegate:d},runningMode:'VIDEO',numPoses:1});
- try{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('GPU'))}catch{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('CPU'))}return pose})().catch(e=>{poseWait=null;throw e})}
+ try{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('GPU'));poseDev='显卡'}catch{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('CPU'));poseDev='芯片'}return pose})().catch(e=>{poseWait=null;throw e})}
+// 交给认人模型前先把画面缩到长边 480（模型自己只看 256×256），手机相机给的画面很大时省下搬运时间
+const cnPoseCv=document.createElement('canvas');
+function cnPoseImg(v){const vw=v.videoWidth,vh=v.videoHeight,k=480/Math.max(vw,vh);if(k>=1)return v;const w=Math.round(vw*k),h=Math.round(vh*k);if(cnPoseCv.width!==w||cnPoseCv.height!==h){cnPoseCv.width=w;cnPoseCv.height=h}cnPoseCv.getContext('2d').drawImage(v,0,0,w,h);return cnPoseCv}
 // 颠球还要认球：认物体模型 EfficientDet-Lite0（半精度版，显卡也能跑），只留「运动用球」，也在手机上跑
 // 先试显卡（比芯片快：Mac 上 36 毫秒降到 23 毫秒），拿画出来的球试认一下，认不出就改用芯片（有的手机显卡算不对）
 function ballInit(){if(ballDet)return Promise.resolve(ballDet);return ballWait??=(async()=>{await poseInit();const B='vendor/mediapipe/',files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'};
  const make=d=>Vision.ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:B+'efficientdet_lite0_f16.tflite',delegate:d},runningMode:'VIDEO',scoreThreshold:0.2,maxResults:3,categoryAllowlist:['sports ball']});
- let gpu=null;try{gpu=await make('GPU');if((gpu.detectForVideo(cnProbeBall(),1).detections||[]).length)return ballDet=gpu}catch{}
- try{gpu?.close()}catch{}return ballDet=await make('CPU')})().catch(e=>{ballWait=null;throw e})}
+ let gpu=null;try{gpu=await make('GPU');if((gpu.detectForVideo(cnProbeBall(),1).detections||[]).length){ballDev='显卡';return ballDet=gpu}}catch{}
+ try{gpu?.close()}catch{}ballDev='芯片';return ballDet=await make('CPU')})().catch(e=>{ballWait=null;throw e})}
 // 试认用的球：绿底上画一个白底黑块的足球，直径占图的四分之一（不靠表情字体，哪家手机画出来都一样；Mac 上芯片、显卡都认得出，0.82 分。画太大反而认不出）
 function cnProbeBall(){const c=Object.assign(document.createElement('canvas'),{width:320,height:320}),g=c.getContext('2d'),R=40,P=Math.PI,pent=(x,y,r,a)=>{g.beginPath();for(let k=0;k<5;k++)g.lineTo(x+r*Math.cos(a+k*2*P/5),y+r*Math.sin(a+k*2*P/5));g.closePath();g.fill()};
  g.fillStyle='#4f8a4b';g.fillRect(0,0,320,320);const gr=g.createRadialGradient(146,146,4,160,160,R);gr.addColorStop(0,'#fff');gr.addColorStop(1,'#bbb');g.fillStyle=gr;g.beginPath();g.arc(160,160,R,0,7);g.fill();
@@ -356,7 +359,7 @@ function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div
   :cnBusy()?`<button class="start stop" onclick="cnFinish(false)">${cn.phase==='cd'?'取消':'结束'}</button>`
   :`<div class="cnt-res"><button onclick="cnAdj(-1)">−</button><b>${cn.count+cn.adj}</b><button onclick="cnAdj(1)">＋</button></div><p class="muted" style="text-align:center;margin:0 0 10px">AI 数了 ${cn.count} ${a.unit}${cn.adj?`，老师改了 ${cn.adj>0?'+':''}${cn.adj}`:''}${cn.rec?cnBlob?' · 视频已录好':cnRec?' · 视频还在生成':' · 这次没录上视频':''}</p>
    ${st?`<button class="sub" style="width:100%" onclick="cnSaveRes()">保存${esc(st.name)}的成绩，传到电脑</button>`:'<p class="muted" style="text-align:center">没选学生，这次只看结果、不保存。</p>'}<div class="row2"><button class="ghost" onclick="cnAgain()">不要了，重测</button></div>`;
- $('app').innerHTML=`<section class="card" style="padding:10px">${cnBusy()?'':who}<div id="cnbox"></div><div class="cnt-st"><span id="cnhint">${esc(cnHint||a.tip)}</span><span id="cnfps" style="white-space:nowrap">${cnFps?`识别 ${Math.round(cnFps)} 帧/秒`:''}</span></div>${ctl}</section>`;
+ $('app').innerHTML=`<section class="card" style="padding:10px">${cnBusy()?'':who}<div id="cnbox"></div><div class="cnt-st"><span id="cnhint">${esc(cnHint||a.tip)}</span><span id="cnfps" style="white-space:nowrap">${cnFps?`识别 ${Math.round(cnFps)} 帧/秒`:''}</span></div><div id="cndiag" class="muted" style="font-size:12px;margin:2px 0 0"></div>${ctl}</section>`;
  $('cnbox').append(cnCanvas)}
 function cnSet(k,v){if(cnBusy())return;cn[k]=v;cnKeep();draw()}
 function cnPick(){if(cnBusy())return;const m=cnAct().metric,list=S().students;
@@ -373,18 +376,20 @@ async function cnCam(){cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;
  el.srcObject=cnStream;try{await el.play()}catch{}return true}
 // 每来一帧：识别、计数、画到 canvas 上；支持的手机按真实帧率走，不支持的大约每秒 30 次。
 // 有的手机对看不见的 video 不给帧回调，半秒没动静就改用 requestAnimationFrame。
-function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCallback' in HTMLVideoElement.prototype,frames=0,fpsT=performance.now(),lastRun=0,lastStep=performance.now();
+function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCallback' in HTMLVideoElement.prototype,frames=0,fpsT=performance.now(),lastRun=0,lastStep=performance.now(),dp=0,np=0,db=0,nb=0;
  const next=()=>rvfc?v.requestVideoFrameCallback(step):(cnRaf=requestAnimationFrame(step));
  const dog=setInterval(()=>{if(cnStream!==me){clearInterval(dog);return}if(rvfc&&!document.hidden&&performance.now()-lastStep>600){rvfc=false;next()}},500);
  const step=(_,meta)=>{if(cnStream!==me||!me||(meta&&!rvfc))return;next();const now=performance.now();lastStep=now;if(!rvfc){if(now-lastRun<30)return;lastRun=now}if(!v.videoWidth||v.readyState<2)return;
   // 颠球数的是球，人只用来定地面和身高，隔一帧认一次就够，省下的时间多认球；计数用这一帧画面出来的时间，不受认得快慢影响
   const isBall=cnAct().ball,pt=meta?.presentationTime,ft=cnFt=Math.max(cnFt+1,pt>now-500&&pt<=now?pt:now);let lm=cnLm,balls=[];
-  if(!isBall||!lm||now-cnPoseT>=60){lm=null;try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(v,cnTs).landmarks?.[0]||null}catch{}cnLm=lm;cnPoseT=now}frames++;
-  if(isBall&&ballDet)try{balls=cnBalls(v,lm)}catch{}
+  if(!isBall||!lm||now-cnPoseT>=60){lm=null;const a=performance.now();try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(cnPoseImg(v),cnTs).landmarks?.[0]||null}catch{}cnLm=lm;cnPoseT=now;dp+=performance.now()-a;np++}frames++;
+  if(isBall&&ballDet){const a=performance.now();try{balls=cnBalls(v,lm)}catch{}db+=performance.now()-a;nb++}
   if(cn.phase==='run'){const o=cnCounter.push(lm,ft,v.videoWidth/v.videoHeight,balls);cn.count=o.count;cnHint=o.hint||'';if(isBall)cnBall=o.ball||null;if(o.bumped){beep(1500,.035,.18);vibe(15)}if(o.ended){toast(`球落地了，这次颠了 ${o.count} 个`);cnFinish(false)}}
   else{cnBall=balls[0]||null;cnHint=!lm?'没看到人，让学生站进画面里':isBall&&!cnBall?'把球放进画面里':''}
   cnTrk=cnBall?[cnBall,cnTrk[0]]:[];
-  if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':cn.act==='juggle'&&cnFps<15?' · 偏慢，可能漏数':'')}
+  if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':cn.act==='juggle'&&cnFps<15?' · 偏慢，可能漏数':'')
+   // 慢的时候写出慢在哪：相机给的画面多大、每秒几帧，认人、认球各要几毫秒，用的显卡还是芯片（截图发过来就能看出来）
+   const g=$('cndiag'),st=me.getVideoTracks()[0]?.getSettings?.()||{};if(g)g.textContent=cnFps<20?`画面 ${v.videoWidth}×${v.videoHeight}${st.frameRate?` ${Math.round(st.frameRate)} 帧`:''} · 认人 ${np?Math.round(dp/np):'-'} 毫秒（${poseDev}）${isBall?` · 认球 ${nb?Math.round(db/nb):'-'} 毫秒（${ballDev}）`:''}`:'';dp=np=db=nb=0}
   const h=$('cnhint');if(h)h.textContent=cnHint||(cn.phase==='run'?'正在数…':cnAct().tip);cnDraw(v)};
  next()}
 function cnDraw(v){const c=cnCanvas,g=c.getContext('2d'),vw=v.videoWidth,vh=v.videoHeight;

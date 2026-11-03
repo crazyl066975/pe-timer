@@ -63,11 +63,15 @@ function angleCounter(kind,{need,measure,rest,act}){
 // 这个最低点贴着地面就是落地：开始颠以后一落地就结束（开始前从地上挑球不算）。在地上停住 0.8 秒、或在低处看不见球 1.2 秒，也算落地。
 // 帧率低时拍不到球正好在最低点的那一帧，所以最低点用前后两段的走势延长线交点来估，免得把落地看成一次低位触球。
 // 看着像落地的先不马上停：0.9 秒内又被正常碰起来，说明刚才那下其实是低位触球，补数上；没有再碰、或又在地上弹一下，才算真落地。
+// 认球框常让球看着比实际高一点或低一点，落地那下就可能被当成低位触球。所以结束时再回头看：最后几下的最低点要是和球最后贴地的高度
+// 差不到 NEAR，其实是落地弹起来，减掉（1.6 在假相机上常因此多数一个）。球在低处停住不动 0.8 秒（滚着也行）也算落地。
 // 门槛是用模拟数据试出来的，还要用真视频再调。
 function juggleCounter(){
- const RISE=0.15,FALL=0.15,GROUND=0.1;
- let count=0,lastT=null,scale=null,ground=null,h=null,down=false,ext=null,extT=0,hist=[],last=-1e9,low=0,lost=0,prev=null,started=false,ended=false,dropT=null;
- const stop=ball=>{ended=true;return {count,ok:true,ended:true,ball,hint:'球落地了'}};
+ const RISE=0.15,FALL=0.15,GROUND=0.1,NEAR=0.15;
+ let count=0,lastT=null,scale=null,ground=null,h=null,down=false,ext=null,extT=0,hist=[],last=-1e9,low=0,lost=0,prev=null,started=false,ended=false,dropT=null,dropB=0,tl=[],fl=null,sh=null,sms=0;
+ // tl：数上的每一下（时间、最低点）；fl：最后一下之后，球贴地的最低高度
+ const floor=v=>{fl=fl===null?v:Math.min(fl,v)},hit=(t,b)=>{count++;tl.push({t,b});fl=null};
+ const stop=ball=>{ended=true;if(fl!==null)while(tl.length&&tl[tl.length-1].b<=fl+NEAR&&lastT-tl[tl.length-1].t<2000){tl.pop();count--}return {count,ok:true,ended:true,ball,hint:'球落地了'}};
  const line=(a,b)=>{const k=(b.h-a.h)/((b.t-a.t)||1);return {k,b:a.h-k*a.t}};
  function bottom(){const i=hist.findIndex(p=>p.t===extT);if(i<1||i>=hist.length-1)return ext;
   const d=i>=2?line(hist[i-2],hist[i-1]):line(hist[i-1],hist[i]),u=i+2<hist.length?line(hist[i+1],hist[i+2]):line(hist[i],hist[i+1]);
@@ -87,13 +91,14 @@ function juggleCounter(){
    lost=0;prev=ball;h=ease(h,(ground-(ball.y+ball.r))/scale,dt,30);let bumped=false;hist.push({t,h});if(hist.length>12)hist.shift();
    // 往上走时记最高点，掉下 FALL 就算开始往下；往下走时记最低点，抬起 RISE 就算到底了
    if(!down){ext=ext===null?h:Math.max(ext,h);if(h<ext-FALL){down=true;ext=h;extT=t}}
-   else{if(h<ext){ext=h;extT=t}if(h>ext+RISE){
-    if(bottom()<=GROUND){if(started){if(dropT!==null)return stop(ball);dropT=t}}
-    else{if(dropT!==null){count++;dropT=null}if(t-last>=250){count++;started=true;last=t;bumped=true}}
+   else{if(h<ext){ext=h;extT=t}if(h>ext+RISE){const b=bottom();
+    if(b<=GROUND){if(started){floor(b);if(dropT!==null)return stop(ball);dropT=t;dropB=b}}
+    else{if(dropT!==null){hit(dropT,dropB);dropT=null}if(t-last>=250){hit(t,b);started=true;last=t;bumped=true}}
     down=false;ext=h}}
-   if(started&&h<=GROUND){low+=dt;if(low>800)return stop(ball)}else low=0;
+   if(started&&h<=GROUND){low+=dt;floor(h);if(low>800)return stop(ball)}else low=0;
+   if(started&&h<0.6&&sh!==null&&Math.abs(h-sh)<0.1){sms+=dt;if(sms>300)floor(h);if(sms>800)return stop(ball)}else{sh=h;sms=0}
    return {count,ok:true,bumped,ball,value:h,hint:started?'':'开始颠球'}},
-  reset(){count=0;lastT=scale=ground=h=ext=prev=dropT=null;down=false;extT=0;hist=[];last=-1e9;low=lost=0;started=ended=false}};
+  reset(){count=0;lastT=scale=ground=h=ext=prev=dropT=fl=sh=null;down=false;extT=dropB=sms=0;hist=[];tl=[];last=-1e9;low=lost=0;started=ended=false}};
 }
 const oneSide=pairs=>lm=>{if(!lm)return null;const ids=side(lm,pairs);return ids.every(i=>seen(lm,i))?ids:null};
 const bothSides=ids=>lm=>lm&&ids.every(i=>seen(lm,i))?ids:null;

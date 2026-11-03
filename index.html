@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.5';
+const LS='pe-assistant-v1',APP_VER='1.6';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -302,7 +302,7 @@ const CN_DUR=[[30,'30 秒'],[60,'1 分钟'],[0,'不限时']],CN_MAX=180,NUMF='"D
 let cn={act:'rope',dur:60,rec:true,front:false,sid:'',phase:'idle',count:0,adj:0,t0:0,end:0,full:false,err:''};
 try{const o=JSON.parse(localStorage.getItem(LS+'-cn'))||{};for(const k of ['act','dur','rec','front'])if(k in o)cn[k]=o[k];if(!PECount.ACTIONS[cn.act])cn.act='rope'}catch{}
 const cnKeep=()=>{try{localStorage.setItem(LS+'-cn',JSON.stringify({act:cn.act,dur:cn.dur,rec:cn.rec,front:cn.front}))}catch{}};
-let pose=null,poseWait=null,cnStream=null,cnCounter=null,cnRec=null,cnBits=[],cnBlob=null,cnRaf=0,cnTs=0,cnFps=0,cnLm=null,cnHint='',cnTick=0,cnBeepAt=0;
+let pose=null,poseWait=null,ballDet=null,ballWait=null,cnStream=null,cnCounter=null,cnRec=null,cnBits=[],cnBlob=null,cnRaf=0,cnTs=0,cnFps=0,cnLm=null,cnBall=null,cnHint='',cnTick=0,cnBeepAt=0;
 const cnCanvas=Object.assign(document.createElement('canvas'),{width:480,height:640,className:'cntc'});
 const cnBusy=()=>cn.phase==='cd'||cn.phase==='run';
 const cnAct=()=>PECount.ACTIONS[cn.act];
@@ -316,6 +316,15 @@ function poseInit(){if(pose)return Promise.resolve(pose);return poseWait??=(asyn
  if(!await Vision.FilesetResolver.isSimdSupported())throw Error('这台手机的系统浏览器内核太旧，用不了 AI 计数。到应用商店更新「Android System WebView」后再试。');
  const files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'},opt=d=>({baseOptions:{modelAssetPath:B+'pose_landmarker_lite.task',delegate:d},runningMode:'VIDEO',numPoses:1});
  try{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('GPU'))}catch{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('CPU'))}return pose})().catch(e=>{poseWait=null;throw e})}
+// 颠球还要认球：认物体模型 EfficientDet-Lite0，只留「运动用球」，也在手机上跑
+function ballInit(){if(ballDet)return Promise.resolve(ballDet);return ballWait??=(async()=>{await poseInit();const B='vendor/mediapipe/';
+ ballDet=await Vision.ObjectDetector.createFromOptions({wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'},{baseOptions:{modelAssetPath:B+'efficientdet_lite0.tflite',delegate:'CPU'},runningMode:'VIDEO',scoreThreshold:0.2,maxResults:3,categoryAllowlist:['sports ball']});return ballDet})().catch(e=>{ballWait=null;throw e})}
+// 按人在画面里的位置截一块正方形（头顶上留出球飞高的地方），缩到 320×320 再认，球小也认得出；没看到人就用整个画面
+const cnBallCv=Object.assign(document.createElement('canvas'),{width:320,height:320});
+function cnBalls(v,lm){const vw=v.videoWidth,vh=v.videoHeight,on=(lm||[]).filter(p=>(p.visibility??1)>=0.5);let x0=0,y0=0,side=Math.max(vw,vh);
+ if(on.length>=8){const xs=on.map(p=>p.x*vw),ys=on.map(p=>p.y*vh),bot=Math.max(...ys),hh=bot-Math.min(...ys);side=Math.min(Math.max(vw,vh),Math.max(hh*1.9,(Math.max(...xs)-Math.min(...xs))*1.6));x0=(Math.min(...xs)+Math.max(...xs)-side)/2;y0=bot+hh*0.15-side}
+ const g=cnBallCv.getContext('2d'),k=side/320;g.fillStyle='#000';g.fillRect(0,0,320,320);g.drawImage(v,x0,y0,side,side,0,0,320,320);
+ return (ballDet.detectForVideo(cnBallCv,cnTs).detections||[]).map(d=>{const b=d.boundingBox;return {x:(x0+(b.originX+b.width/2)*k)/vw,y:(y0+(b.originY+b.height/2)*k)/vh,r:(b.width+b.height)/4*k/vh}})}
 function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div class="card empty">先点右上角选一个班级</div>';return}
  const a=cnAct(),st=cnStu(),wait=vids.filter(v=>!v.done).length,who=`<button class="ghost cnwho" onclick="cnPick()" ${cnBusy()?'disabled':''}><span>${st?`<b>${esc(st.name)}</b> <small class="muted">学号 ${esc(st.number)}</small>`:'选择学生'}</span><span class="muted" style="font-size:13px;text-align:right">${st?cnDest(st):'▾'}</span></button>`;
  if(cn.phase==='idle'||cn.phase==='loading'){
@@ -323,7 +332,7 @@ function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div
   <div class="chips">时间：${CN_DUR.map(([d,l])=>`<button class="${d===cn.dur?'on':''}" onclick="cnSet('dur',${d})">${l}</button>`).join('')}</div>${who}
   <label class="chk"><input type="checkbox" ${cn.rec?'checked':''} onchange="cn.rec=this.checked;cnKeep()">同时录像（带骨架线和计数），保存时一起传到电脑</label>
   <p class="muted">${esc(a.tip)}</p><button class="start" onclick="cnOpen()" ${cn.phase==='loading'?'disabled':''}>${cn.phase==='loading'?'正在加载 AI 模型…':'打开相机'}</button>
-  ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
+  ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${a.ball?'颠球还要多加载一个认球模型（约 5MB）。':''}${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
   ${wait?`<p class="muted" style="text-align:center">还有 ${wait} 个视频在传，进度在「视频」里看</p>`:''}`;return}
  const ctl=cn.phase==='ready'?`<button class="start" onclick="cnStart()">开始（3 秒后鸣哨）</button><div class="row2"><button class="ghost" onclick="cnFlip()">${cn.front?'换后置相机':'换前置相机'}</button><button class="ghost" onclick="cnClose();draw()">关闭相机</button></div>`
   :cnBusy()?`<button class="start stop" onclick="cnFinish(false)">${cn.phase==='cd'?'取消':'结束'}</button>`
@@ -338,7 +347,7 @@ function cnPick(){if(cnBusy())return;const m=cnAct().metric,list=S().students;
 function cnNext(){const list=S().students,i=list.findIndex(s=>s.id===cn.sid),m=cn.dur===60?cnAct().metric||'':'';const rest=[...list.slice(i+1),...list.slice(0,Math.max(0,i))];
  cn.sid=(rest.find(s=>!(m&&s.req?.includes(m)&&valOf(s,m)!==undefined&&valOf(s,m)!==''))||{}).id||''}
 async function cnOpen(){if(cn.phase!=='idle')return;cn.err='';cn.phase='loading';draw();
- try{await poseInit()}catch(e){cn.phase='idle';cn.err=/内核/.test(e.message)?e.message:'AI 模型没有加载成功（'+e.message+'），关掉 App 再打开试试';draw();return}
+ try{await poseInit();if(cnAct().ball)await ballInit()}catch(e){cn.phase='idle';cn.err=/内核/.test(e.message)?e.message:'AI 模型没有加载成功（'+e.message+'），关掉 App 再打开试试';draw();return}
  if(tab!=='count'||cn.phase!=='loading')return;if(!await cnCam()){cn.phase='idle';draw();return}cn.phase='ready';draw();cnLoop()}
 async function cnCam(){cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v={facingMode:cn.front?'user':'environment',width:{ideal:960},height:{ideal:720},frameRate:{ideal:30}};
  try{cnStream=await navigator.mediaDevices.getUserMedia({video:v,audio:cn.rec})}catch{try{cnStream=await navigator.mediaDevices.getUserMedia({video:v,audio:false})}catch{toast('打不开相机，请在手机设置里允许「体育助手」使用相机');return false}}
@@ -350,8 +359,10 @@ function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCall
  const next=()=>rvfc?v.requestVideoFrameCallback(step):(cnRaf=requestAnimationFrame(step));
  const dog=setInterval(()=>{if(cnStream!==me){clearInterval(dog);return}if(rvfc&&!document.hidden&&performance.now()-lastStep>600){rvfc=false;next()}},500);
  const step=(_,meta)=>{if(cnStream!==me||!me||(meta&&!rvfc))return;next();const now=performance.now();lastStep=now;if(!rvfc){if(now-lastRun<30)return;lastRun=now}if(!v.videoWidth||v.readyState<2)return;
-  let lm=null;try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(v,cnTs).landmarks?.[0]||null}catch{}cnLm=lm;frames++;
-  if(cn.phase==='run'){const o=cnCounter.push(lm,now,v.videoWidth/v.videoHeight);cn.count=o.count;cnHint=o.hint||'';if(o.bumped){beep(1500,.035,.18);vibe(15)}}else cnHint=lm?'':'没看到人，让学生站进画面里';
+  let lm=null,balls=[];try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(v,cnTs).landmarks?.[0]||null}catch{}cnLm=lm;frames++;
+  if(cnAct().ball&&ballDet)try{balls=cnBalls(v,lm)}catch{}
+  if(cn.phase==='run'){const o=cnCounter.push(lm,now,v.videoWidth/v.videoHeight,balls);cn.count=o.count;cnHint=o.hint||'';if(cnAct().ball)cnBall=o.ball||null;if(o.bumped){beep(1500,.035,.18);vibe(15)}if(o.ended){toast(`球落地了，这次颠了 ${o.count} 个`);cnFinish(false)}}
+  else{cnBall=balls[0]||null;cnHint=!lm?'没看到人，让学生站进画面里':cnAct().ball&&!cnBall?'把球放进画面里':''}
   if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':'')}
   const h=$('cnhint');if(h)h.textContent=cnHint||(cn.phase==='run'?'正在数…':cnAct().tip);cnDraw(v)};
  next()}
@@ -361,6 +372,7 @@ function cnDraw(v){const c=cnCanvas,g=c.getContext('2d'),vw=v.videoWidth,vh=v.vi
  g.save();if(cn.front){g.translate(w,0);g.scale(-1,1)}g.drawImage(v,0,0,w,h);
  if(lm){g.lineCap='round';g.lineWidth=Math.max(3,u*0.9);g.strokeStyle=cn.phase==='run'?'#22c3ee':'#ffffffb0';g.beginPath();for(const [a,b] of PECount.LINES){if(!on(lm[a])||!on(lm[b]))continue;g.moveTo(lm[a].x*w,lm[a].y*h);g.lineTo(lm[b].x*w,lm[b].y*h)}g.stroke();
   g.fillStyle='#fbbf24';for(const i of PECount.POINTS){const p=lm[i];if(!on(p))continue;g.beginPath();g.arc(p.x*w,p.y*h,Math.max(3,u*0.9),0,7);g.fill()}}
+ if(cnBall){g.strokeStyle='#f97316';g.lineWidth=Math.max(3,u*0.8);g.beginPath();g.arc(cnBall.x*w,cnBall.y*h,Math.max(cnBall.r*h,u*2.5),0,7);g.stroke()}
  g.restore();
  // 上面：次数和计时；下面：学生、项目、时间。全都画进画面，录下来的视频里也有
  const a=cnAct(),st=cnStu(),n=cn.count+(cn.phase==='done'?cn.adj:0);g.textBaseline='middle';g.fillStyle='#0a1222b8';g.fillRect(0,0,w,u*18);g.fillRect(0,h-u*9,w,u*9);
@@ -394,7 +406,7 @@ function cnSaveRes(){const st=cnStu();if(!st||cn.phase!=='done')return;const a=c
  if(!m){beep(1200,.06,.25);vibe(30)}toast(`已保存 ${st.name} ${n} ${a.unit}${cnBlob?'，视频正在传':''}${online()?'':'，有信号后自动传到电脑'}`);
  cnBlob=null;cnNext();cn.phase='ready';cn.count=0;cn.adj=0;draw()}
 function cnFlip(){if(cnBusy())return;cn.front=!cn.front;cnKeep();cnCam().then(ok=>{if(ok)cnLoop();else{cn.phase='idle';draw()}})}
-function cnClose(){cnRecStop(true);clearInterval(cnTick);cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v=$('cnsrc');if(v)v.srcObject=null;cnLm=null;cnHint='';cn.phase='idle'}
+function cnClose(){cnRecStop(true);clearInterval(cnTick);cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v=$('cnsrc');if(v)v.srcObject=null;cnLm=null;cnBall=null;cnHint='';cn.phase='idle'}
 // 切到后台：正在数就按「结束」处理；回来时相机断了就重新打开
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(cnBusy())cnFinish(false);return}
  if(tab==='count'&&cnStream&&cnStream.getVideoTracks().every(t=>t.readyState==='ended'))cnCam().then(ok=>{if(ok)cnLoop();else{cn.phase='idle';draw()}})});

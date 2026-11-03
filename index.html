@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.6';
+const LS='pe-assistant-v1',APP_VER='1.6.1';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -470,13 +470,16 @@ const standalone=matchMedia('(display-mode: standalone)').matches||navigator.sta
 const href=location.href,lk=parseLink(href);if(lk&&(D.ended||[]).includes(lk.room)){history.replaceState(null,'',location.pathname);overlay();connect();draw();if(!D.room)toast('这次连接已经结束，请在电脑上重新开始连接后再扫码')}else if(lk){if(standalone)history.replaceState(null,'',location.pathname);pair(href)}else{overlay();connect();draw()}
 vidLoad();
 // 网页版有新版本时：手边没在用就自动刷新；正在计时、录像、输入时，顶部提示点一下再更新
-function appUpdated(){if(appUpdated.done)return;appUpdated.done=true;
- let recent=false;try{recent=Date.now()-Number(sessionStorage.getItem('pe-reloaded')||0)<30000}catch{}
+// 新的离线缓存接手（sw）时就算刚刷新过也再刷新一次：它是整套重新下载的，刚才那次可能拿到新页面配旧文件（1.6 就因此看不到颠球）
+function appUpdated(sw){if(appUpdated.done)return;appUpdated.done=true;
+ let recent=false;try{recent=!sw&&Date.now()-Number(sessionStorage.getItem('pe-reloaded')||0)<30000}catch{}
  const busy=running||cdEnd||recorder||(tab==='count'&&cn.phase!=='idle')||Object.keys(aiReq).length||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||$('dlg').open||$('scan');
  if(!busy&&!recent){try{sessionStorage.setItem('pe-reloaded',String(Date.now()))}catch{}location.reload();return}
  $('upd').hidden=false}
-if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host)){const hadSW=!!navigator.serviceWorker.controller;
+if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host)){const hadSW=!!navigator.serviceWorker.controller;let chk=Date.now();
  navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.t==='updated')appUpdated()});
- navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadSW)appUpdated()});
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadSW)appUpdated(true)});
+ // iPhone 从后台切回来不会重新打开页面，这时也问一下有没有新版（最多一分钟一次）
+ document.addEventListener('visibilitychange',()=>{if(document.hidden||Date.now()-chk<60000)return;chk=Date.now();navigator.serviceWorker.getRegistration().then(r=>r?.update()).catch(()=>{});fetch('./',{cache:'no-cache'}).catch(()=>{})});
  navigator.serviceWorker.register('sw.js').catch(()=>{})}
 </script></body></html>

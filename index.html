@@ -36,7 +36,7 @@ textarea{min-height:70px}
 .item{display:grid;grid-template-columns:1fr 104px;gap:10px;align-items:center;padding:9px 12px;background:var(--card2);border-radius:14px}
 .item.ok{background:#123a2e}.item.wait{background:#3a3415}.item small{color:var(--muted)}
 .item input{padding:9px;font:700 21px var(--num);text-align:center}
-.item.pmrow{grid-template-columns:1fr 150px}.pmw{display:flex;gap:6px}.pmw input{min-width:0}.pm{flex:0 0 42px;font:700 20px var(--num);border-radius:10px;background:#ffffff1a;border:1px solid var(--line)}
+.item.pmrow{grid-template-columns:1fr 150px}.pmw{display:flex;gap:6px}.pmw input{min-width:0}.item.hwrow{grid-template-columns:1fr 176px}.hww{display:grid;grid-template-columns:1fr 1fr;gap:6px}.hww input{min-width:0;padding:9px 4px}.pm{flex:0 0 42px;font:700 20px var(--num);border-radius:10px;background:#ffffff1a;border:1px solid var(--line)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.chips button{padding:7px 12px;font-size:14px;border-radius:99px}.chips button.on{background:var(--primary);color:#fff}
 .seg{display:flex;background:#0f1a30;border-radius:14px;padding:4px;margin-bottom:12px}.seg button{flex:1;padding:10px 4px;background:none;font-size:15px}.seg button.on{background:var(--primary);color:#fff}
 .course{display:grid;grid-template-columns:62px 1fr;gap:12px;padding:12px;background:var(--card2);border-radius:16px;margin-top:8px;text-align:left;width:100%}
@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.6.2';
+const LS='pe-assistant-v1',APP_VER='1.8';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -216,17 +216,25 @@ let scoreKey='';
 function valid(k,v){if(v==='')return true;if(!Number.isFinite(v))return false;if(['rope','situp','lung'].includes(k)&&!Number.isInteger(v))return false;if(['height','weight','run','lung','shuttle'].includes(k))return v>0;return k==='reach'||v>=0}
 const custom=()=>S().custom||[];
 function score(){const s=S();if(!s.students.length){$('app').innerHTML='<div class="card empty">先点右上角选一个班级</div>';return}
- const cus=custom();if(!scoreKey||(!scoreKey.startsWith('c:')&&!s.metrics.some(([k])=>k===scoreKey))||(scoreKey.startsWith('c:')&&!cus.some(c=>'c:'+c.name===scoreKey)))scoreKey=s.metrics[0]?.[0]||(cus[0]?'c:'+cus[0].name:'');
- const chips=`<p class="muted" style="margin:0">国家体质健康测试 · ${esc(s.className)}</p><div class="chips">${s.metrics.map(([k,l])=>`<button class="${k===scoreKey?'on':''}" onclick="scoreKey='${k}';draw()">${esc(l)}</button>`).join('')||'<span class="muted">这个年级没有体测项目</span>'}</div>
+ // 身高、体重是一台仪器一起量出来的：两项都要测就合成一个「身高体重」，同一页一起填
+ const hw=['height','weight'].every(k=>s.metrics.some(([m])=>m===k)),tabs=s.metrics.filter(([k])=>!(hw&&k==='weight')).map(([k,l,u])=>hw&&k==='height'?['hw','身高体重']:[k,l,u]);if(hw&&(scoreKey==='height'||scoreKey==='weight'))scoreKey='hw';
+ const cus=custom();if(!scoreKey||(!scoreKey.startsWith('c:')&&!tabs.some(([k])=>k===scoreKey))||(scoreKey.startsWith('c:')&&!cus.some(c=>'c:'+c.name===scoreKey)))scoreKey=tabs[0]?.[0]||(cus[0]?'c:'+cus[0].name:'');
+ const chips=`<p class="muted" style="margin:0">国家体质健康测试 · ${esc(s.className)}</p><div class="chips">${tabs.map(([k,l])=>`<button class="${k===scoreKey?'on':''}" onclick="scoreKey='${k}';draw()">${esc(l)}</button>`).join('')||'<span class="muted">这个年级没有体测项目</span>'}</div>
  <p class="muted" style="margin:6px 0 0">自定义项目</p><div class="chips">${cus.map(c=>`<button class="${'c:'+c.name===scoreKey?'on':''}" onclick="scoreKey='c:'+decodeURIComponent('${encodeURIComponent(c.name)}');draw()">${esc(c.name)}</button>`).join('')}<button onclick="itemAdd()" style="border:1px dashed var(--line);background:none">＋ 添加项目</button></div>`;
  if(!scoreKey){$('app').innerHTML=chips;return}
  if(scoreKey.startsWith('c:'))return customScore(chips,cus.find(c=>'c:'+c.name===scoreKey));
+ if(scoreKey==='hw')return hwScore(chips);
  const m=s.metrics.find(([k])=>k===scoreKey),list=s.students.filter(x=>x.req.includes(scoreKey)),done=list.filter(x=>valOf(x,scoreKey)!==undefined).length;
  $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">${esc(m?.[1])}（${esc(m?.[2])}）· 已有 ${done}/${list.length} 人 · 输完自动保存，接着点下一个${scoreKey==='reach'?' · 负数点 ±':''}</p>
  <div class="list">${list.map((x,i)=>{const v=valOf(x,scoreKey),w=pendingOf(x,scoreKey);return `<div class="item ${w?'wait':v!==undefined?'ok':''}${scoreKey==='reach'?' pmrow':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}${w?' · 待传':''}</small></div>${scoreKey==='reach'?`<span class="pmw"><button class="pm" onclick="pmFlip(${i},'${x.id}')">±</button>`:''}<input inputmode="decimal" enterkeyhint="next" id="s${i}" placeholder="${esc(m?.[2])}" value="${v??''}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();$('s${i+1}')?.focus()}" onchange="scoreSave('${x.id}',this)">${scoreKey==='reach'?'</span>':''}</div>`}).join('')}</div>`}
+// 身高体重：每人一行两个格，身高输完按「下一项」跳到体重，体重输完跳到下一个人；两项都有了才算填好
+function hwScore(chips){const s=S(),list=s.students.filter(x=>x.req.includes('height')||x.req.includes('weight')),has=(x,k)=>!x.req.includes(k)||valOf(x,k)!==undefined,done=list.filter(x=>has(x,'height')&&has(x,'weight')).length;
+ const cell=(x,i,k,id,nx)=>x.req.includes(k)?`<input inputmode="decimal" enterkeyhint="next" id="${id}${i}" placeholder="${k==='height'?'身高':'体重'}" value="${valOf(x,k)??''}" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();(${nx})?.focus()}" onchange="scoreSave('${x.id}',this,'${k}')">`:'<span></span>';
+ $('app').innerHTML=`${chips}<p class="muted" style="margin:4px 0">身高（厘米）、体重（千克）· 都填好 ${done}/${list.length} 人 · 输完自动保存，身高输完按「下一项」跳到体重</p>
+ <div class="list"><div class="item hwrow" style="background:none;padding:0 12px"><span></span><span class="hww" style="text-align:center"><small>身高 厘米</small><small>体重 千克</small></span></div>${list.map((x,i)=>{const w=pendingOf(x,'height')||pendingOf(x,'weight');return `<div class="item hwrow ${w?'wait':has(x,'height')&&has(x,'weight')?'ok':''}"><div><strong>${esc(x.name)}</strong> <small>${esc(x.number)} ${esc(x.gender)}${w?' · 待传':''}</small></div><span class="hww">${cell(x,i,'height','h',`$('w${i}')||$('h${i+1}')`)}${cell(x,i,'weight','w',`$('h${i+1}')||$('w${i+1}')`)}</span></div>`}).join('')}</div>`}
 function pmFlip(i,id){const inp=$('s'+i),v=inp.value.trim();if(!v||v==='-'){inp.value=v?'':'-';inp.focus();return}inp.value=v.startsWith('-')?v.slice(1):'-'+v;scoreSave(id,inp)}
-function scoreSave(id,inp){const x=S().students.find(s=>s.id===id),raw=inp.value.trim().replace('，','.');if(raw===''&&valOf(x,scoreKey)===undefined)return;const v=raw===''?'':Number(raw);if(!valid(scoreKey,v)){toast('这个成绩不对，请检查');inp.value=valOf(x,scoreKey)??'';return}
- sendScore(x,scoreKey,v);inp.closest('.item').classList.remove('ok');inp.closest('.item').classList.add('wait')}
+function scoreSave(id,inp,k=scoreKey){const x=S().students.find(s=>s.id===id),raw=inp.value.trim().replace('，','.');if(raw===''&&valOf(x,k)===undefined)return;const v=raw===''?'':Number(raw);if(!valid(k,v)){toast('这个成绩不对，请检查');inp.value=valOf(x,k)??'';return}
+ sendScore(x,k,v);inp.closest('.item').classList.remove('ok');inp.closest('.item').classList.add('wait')}
 // 自定义项目：一项一张表，记完点保存，存进电脑「课堂练习」
 let cv={};try{cv=JSON.parse(localStorage.getItem(LS+'-cv'))||{}}catch{}
 const cvSave=()=>{try{localStorage.setItem(LS+'-cv',JSON.stringify(cv))}catch{}};
@@ -302,7 +310,7 @@ const CN_DUR=[[30,'30 秒'],[60,'1 分钟'],[0,'不限时']],CN_MAX=180,NUMF='"D
 let cn={act:'rope',dur:60,rec:true,front:false,sid:'',phase:'idle',count:0,adj:0,t0:0,end:0,full:false,err:''};
 try{const o=JSON.parse(localStorage.getItem(LS+'-cn'))||{};for(const k of ['act','dur','rec','front'])if(k in o)cn[k]=o[k];if(!PECount.ACTIONS[cn.act])cn.act='rope'}catch{}
 const cnKeep=()=>{try{localStorage.setItem(LS+'-cn',JSON.stringify({act:cn.act,dur:cn.dur,rec:cn.rec,front:cn.front}))}catch{}};
-let pose=null,poseWait=null,ballDet=null,ballWait=null,cnStream=null,cnCounter=null,cnRec=null,cnBits=[],cnBlob=null,cnRaf=0,cnTs=0,cnFps=0,cnLm=null,cnBall=null,cnHint='',cnTick=0,cnBeepAt=0;
+let pose=null,poseWait=null,ballDet=null,ballWait=null,cnStream=null,cnCounter=null,cnRec=null,cnBits=[],cnBlob=null,cnRaf=0,cnTs=0,cnFt=0,cnPoseT=0,cnFps=0,cnLm=null,cnBall=null,cnTrk=[],cnHint='',cnTick=0,cnBeepAt=0;
 const cnCanvas=Object.assign(document.createElement('canvas'),{width:480,height:640,className:'cntc'});
 const cnBusy=()=>cn.phase==='cd'||cn.phase==='run';
 const cnAct=()=>PECount.ACTIONS[cn.act];
@@ -316,14 +324,24 @@ function poseInit(){if(pose)return Promise.resolve(pose);return poseWait??=(asyn
  if(!await Vision.FilesetResolver.isSimdSupported())throw Error('这台手机的系统浏览器内核太旧，用不了 AI 计数。到应用商店更新「Android System WebView」后再试。');
  const files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'},opt=d=>({baseOptions:{modelAssetPath:B+'pose_landmarker_lite.task',delegate:d},runningMode:'VIDEO',numPoses:1});
  try{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('GPU'))}catch{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('CPU'))}return pose})().catch(e=>{poseWait=null;throw e})}
-// 颠球还要认球：认物体模型 EfficientDet-Lite0，只留「运动用球」，也在手机上跑
-function ballInit(){if(ballDet)return Promise.resolve(ballDet);return ballWait??=(async()=>{await poseInit();const B='vendor/mediapipe/';
- ballDet=await Vision.ObjectDetector.createFromOptions({wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'},{baseOptions:{modelAssetPath:B+'efficientdet_lite0.tflite',delegate:'CPU'},runningMode:'VIDEO',scoreThreshold:0.2,maxResults:3,categoryAllowlist:['sports ball']});return ballDet})().catch(e=>{ballWait=null;throw e})}
+// 颠球还要认球：认物体模型 EfficientDet-Lite0（半精度版，显卡也能跑），只留「运动用球」，也在手机上跑
+// 先试显卡（比芯片快：Mac 上 36 毫秒降到 23 毫秒），拿画出来的球试认一下，认不出就改用芯片（有的手机显卡算不对）
+function ballInit(){if(ballDet)return Promise.resolve(ballDet);return ballWait??=(async()=>{await poseInit();const B='vendor/mediapipe/',files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'};
+ const make=d=>Vision.ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:B+'efficientdet_lite0_f16.tflite',delegate:d},runningMode:'VIDEO',scoreThreshold:0.2,maxResults:3,categoryAllowlist:['sports ball']});
+ let gpu=null;try{gpu=await make('GPU');if((gpu.detectForVideo(cnProbeBall(),1).detections||[]).length)return ballDet=gpu}catch{}
+ try{gpu?.close()}catch{}return ballDet=await make('CPU')})().catch(e=>{ballWait=null;throw e})}
+// 试认用的球：绿底上画一个白底黑块的足球，直径占图的四分之一（不靠表情字体，哪家手机画出来都一样；Mac 上芯片、显卡都认得出，0.82 分。画太大反而认不出）
+function cnProbeBall(){const c=Object.assign(document.createElement('canvas'),{width:320,height:320}),g=c.getContext('2d'),R=40,P=Math.PI,pent=(x,y,r,a)=>{g.beginPath();for(let k=0;k<5;k++)g.lineTo(x+r*Math.cos(a+k*2*P/5),y+r*Math.sin(a+k*2*P/5));g.closePath();g.fill()};
+ g.fillStyle='#4f8a4b';g.fillRect(0,0,320,320);const gr=g.createRadialGradient(146,146,4,160,160,R);gr.addColorStop(0,'#fff');gr.addColorStop(1,'#bbb');g.fillStyle=gr;g.beginPath();g.arc(160,160,R,0,7);g.fill();
+ g.save();g.beginPath();g.arc(160,160,R,0,7);g.clip();g.fillStyle='#111';pent(160,160,R*.3,-P/2);for(let k=0;k<5;k++){const t=-P/2+(k+.5)*2*P/5;pent(160+R*.85*Math.cos(t),160+R*.85*Math.sin(t),R*.28,t+P)}
+ g.strokeStyle='#222';g.lineWidth=1.6;for(let k=0;k<5;k++){const t=-P/2+k*2*P/5;g.beginPath();g.moveTo(160+R*.3*Math.cos(t),160+R*.3*Math.sin(t));g.lineTo(160+R*.62*Math.cos(t),160+R*.62*Math.sin(t));g.stroke()}g.restore();return c}
 // 按人在画面里的位置截一块正方形（头顶上留出球飞高的地方），缩到 320×320 再认，球小也认得出；没看到人就用整个画面
+// 上一帧认到了球，就只在球附近截（边长约 7 个球宽，按前两帧的走势往前挪一点），球在图里大一倍左右，糊一点也容易认出；跟丢了再按人截
 const cnBallCv=Object.assign(document.createElement('canvas'),{width:320,height:320});
-function cnBalls(v,lm){const vw=v.videoWidth,vh=v.videoHeight,on=(lm||[]).filter(p=>(p.visibility??1)>=0.5);let x0=0,y0=0,side=Math.max(vw,vh);
- if(on.length>=8){const xs=on.map(p=>p.x*vw),ys=on.map(p=>p.y*vh),bot=Math.max(...ys),hh=bot-Math.min(...ys);side=Math.min(Math.max(vw,vh),Math.max(hh*1.9,(Math.max(...xs)-Math.min(...xs))*1.6));x0=(Math.min(...xs)+Math.max(...xs)-side)/2;y0=bot+hh*0.15-side}
- const g=cnBallCv.getContext('2d'),k=side/320;g.fillStyle='#000';g.fillRect(0,0,320,320);g.drawImage(v,x0,y0,side,side,0,0,320,320);
+function cnBalls(v,lm){const vw=v.videoWidth,vh=v.videoHeight,on=(lm||[]).filter(p=>(p.visibility??1)>=0.5),[a,b]=cnTrk;let x0=0,y0=0,side=Math.max(vw,vh);
+ if(a){side=Math.min(side,Math.max(a.r*vh*14,120));x0=(2*a.x-(b||a).x)*vw-side/2;y0=(2*a.y-(b||a).y)*vh-side/2}
+ else if(on.length>=8){const xs=on.map(p=>p.x*vw),ys=on.map(p=>p.y*vh),bot=Math.max(...ys),hh=bot-Math.min(...ys);side=Math.min(Math.max(vw,vh),Math.max(hh*1.9,(Math.max(...xs)-Math.min(...xs))*1.6));x0=(Math.min(...xs)+Math.max(...xs)-side)/2;y0=bot+hh*0.15-side}
+ const g=cnBallCv.getContext('2d'),k=side/320;g.fillStyle='#000';g.fillRect(0,0,320,320);g.drawImage(v,x0,y0,side,side,0,0,320,320);cnTs=Math.max(cnTs+1,Math.round(performance.now()));
  return (ballDet.detectForVideo(cnBallCv,cnTs).detections||[]).map(d=>{const b=d.boundingBox;return {x:(x0+(b.originX+b.width/2)*k)/vw,y:(y0+(b.originY+b.height/2)*k)/vh,r:(b.width+b.height)/4*k/vh}})}
 function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div class="card empty">先点右上角选一个班级</div>';return}
  const a=cnAct(),st=cnStu(),wait=vids.filter(v=>!v.done).length,who=`<button class="ghost cnwho" onclick="cnPick()" ${cnBusy()?'disabled':''}><span>${st?`<b>${esc(st.name)}</b> <small class="muted">学号 ${esc(st.number)}</small>`:'选择学生'}</span><span class="muted" style="font-size:13px;text-align:right">${st?cnDest(st):'▾'}</span></button>`;
@@ -332,7 +350,7 @@ function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div
   <div class="chips">时间：${CN_DUR.map(([d,l])=>`<button class="${d===cn.dur?'on':''}" onclick="cnSet('dur',${d})">${l}</button>`).join('')}</div>${who}
   <label class="chk"><input type="checkbox" ${cn.rec?'checked':''} onchange="cn.rec=this.checked;cnKeep()">同时录像（带骨架线和计数），保存时一起传到电脑</label>
   <p class="muted">${esc(a.tip)}</p><button class="start" onclick="cnOpen()" ${cn.phase==='loading'?'disabled':''}>${cn.phase==='loading'?'正在加载 AI 模型…':'打开相机'}</button>
-  ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${a.ball?'颠球还要多加载一个认球模型（约 5MB）。':''}${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
+  ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${a.ball?'颠球还要多加载一个认球模型（约 7MB）。':''}${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
   ${wait?`<p class="muted" style="text-align:center">还有 ${wait} 个视频在传，进度在「视频」里看</p>`:''}`;return}
  const ctl=cn.phase==='ready'?`<button class="start" onclick="cnStart()">开始（3 秒后鸣哨）</button><div class="row2"><button class="ghost" onclick="cnFlip()">${cn.front?'换后置相机':'换前置相机'}</button><button class="ghost" onclick="cnClose();draw()">关闭相机</button></div>`
   :cnBusy()?`<button class="start stop" onclick="cnFinish(false)">${cn.phase==='cd'?'取消':'结束'}</button>`
@@ -359,11 +377,14 @@ function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCall
  const next=()=>rvfc?v.requestVideoFrameCallback(step):(cnRaf=requestAnimationFrame(step));
  const dog=setInterval(()=>{if(cnStream!==me){clearInterval(dog);return}if(rvfc&&!document.hidden&&performance.now()-lastStep>600){rvfc=false;next()}},500);
  const step=(_,meta)=>{if(cnStream!==me||!me||(meta&&!rvfc))return;next();const now=performance.now();lastStep=now;if(!rvfc){if(now-lastRun<30)return;lastRun=now}if(!v.videoWidth||v.readyState<2)return;
-  let lm=null,balls=[];try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(v,cnTs).landmarks?.[0]||null}catch{}cnLm=lm;frames++;
-  if(cnAct().ball&&ballDet)try{balls=cnBalls(v,lm)}catch{}
-  if(cn.phase==='run'){const o=cnCounter.push(lm,now,v.videoWidth/v.videoHeight,balls);cn.count=o.count;cnHint=o.hint||'';if(cnAct().ball)cnBall=o.ball||null;if(o.bumped){beep(1500,.035,.18);vibe(15)}if(o.ended){toast(`球落地了，这次颠了 ${o.count} 个`);cnFinish(false)}}
-  else{cnBall=balls[0]||null;cnHint=!lm?'没看到人，让学生站进画面里':cnAct().ball&&!cnBall?'把球放进画面里':''}
-  if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':'')}
+  // 颠球数的是球，人只用来定地面和身高，隔一帧认一次就够，省下的时间多认球；计数用这一帧画面出来的时间，不受认得快慢影响
+  const isBall=cnAct().ball,pt=meta?.presentationTime,ft=cnFt=Math.max(cnFt+1,pt>now-500&&pt<=now?pt:now);let lm=cnLm,balls=[];
+  if(!isBall||!lm||now-cnPoseT>=60){lm=null;try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(v,cnTs).landmarks?.[0]||null}catch{}cnLm=lm;cnPoseT=now}frames++;
+  if(isBall&&ballDet)try{balls=cnBalls(v,lm)}catch{}
+  if(cn.phase==='run'){const o=cnCounter.push(lm,ft,v.videoWidth/v.videoHeight,balls);cn.count=o.count;cnHint=o.hint||'';if(isBall)cnBall=o.ball||null;if(o.bumped){beep(1500,.035,.18);vibe(15)}if(o.ended){toast(`球落地了，这次颠了 ${o.count} 个`);cnFinish(false)}}
+  else{cnBall=balls[0]||null;cnHint=!lm?'没看到人，让学生站进画面里':isBall&&!cnBall?'把球放进画面里':''}
+  cnTrk=cnBall?[cnBall,cnTrk[0]]:[];
+  if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':cn.act==='juggle'&&cnFps<15?' · 偏慢，可能漏数':'')}
   const h=$('cnhint');if(h)h.textContent=cnHint||(cn.phase==='run'?'正在数…':cnAct().tip);cnDraw(v)};
  next()}
 function cnDraw(v){const c=cnCanvas,g=c.getContext('2d'),vw=v.videoWidth,vh=v.videoHeight;
@@ -406,7 +427,7 @@ function cnSaveRes(){const st=cnStu();if(!st||cn.phase!=='done')return;const a=c
  if(!m){beep(1200,.06,.25);vibe(30)}toast(`已保存 ${st.name} ${n} ${a.unit}${cnBlob?'，视频正在传':''}${online()?'':'，有信号后自动传到电脑'}`);
  cnBlob=null;cnNext();cn.phase='ready';cn.count=0;cn.adj=0;draw()}
 function cnFlip(){if(cnBusy())return;cn.front=!cn.front;cnKeep();cnCam().then(ok=>{if(ok)cnLoop();else{cn.phase='idle';draw()}})}
-function cnClose(){cnRecStop(true);clearInterval(cnTick);cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v=$('cnsrc');if(v)v.srcObject=null;cnLm=null;cnBall=null;cnHint='';cn.phase='idle'}
+function cnClose(){cnRecStop(true);clearInterval(cnTick);cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v=$('cnsrc');if(v)v.srcObject=null;cnLm=null;cnBall=null;cnTrk=[];cnHint='';cn.phase='idle'}
 // 切到后台：正在数就按「结束」处理；回来时相机断了就重新打开
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(cnBusy())cnFinish(false);return}
  if(tab==='count'&&cnStream&&cnStream.getVideoTracks().every(t=>t.readyState==='ended'))cnCam().then(ok=>{if(ok)cnLoop();else{cn.phase='idle';draw()}})});

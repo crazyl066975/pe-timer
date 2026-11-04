@@ -4,7 +4,7 @@
 (function(root){
 const ACTIONS={
  rope:{name:'跳绳',unit:'次',metric:'rope',tip:'手机竖着架在学生正面或侧面 2–3 米外，拍到全身。画面里只留一个学生。'},
- situp:{name:'仰卧起坐',unit:'次',metric:'situp',tip:'手机架在学生侧面，拍到头、腰和膝盖。肩膀碰垫、双肘碰到膝盖才算一个。'},
+ situp:{name:'仰卧起坐',unit:'次',metric:'situp',people:2,tip:'手机架在学生侧面，拍到头、腰和膝盖。肩膀碰垫、双肘碰到膝盖才算一个。'},
  jack:{name:'开合跳',unit:'个',tip:'手机放在学生正面，拍到全身。双手要举过头顶才算一个。'},
  squat:{name:'深蹲',unit:'个',tip:'手机放在学生侧面，拍到全身。蹲到大腿接近水平才算一个。'},
  juggle:{name:'颠球',unit:'个',ball:true,tip:'手机放在学生侧前方 3 米外，拍到全身和球，画面里只留一个球。球落地就自动停，建议选「不限时」。'},
@@ -58,6 +58,25 @@ function angleCounter(kind,{need,measure,rest,act}){
    if(atRest(v))state='rest';else if(state==='rest'&&atAct(v)){state='act';count++;bumped=true}
    return {count,ok:true,bumped,value:Math.round(v),hint:state===null?'先做好准备姿势':''}},
   reset(){count=0;state=null;v=null;lastT=null}};
+}
+// 仰卧起坐体测要有同学压脚，画面里常有两个人：页面需要时让认人模型一次认两个人（ACTIONS 里的 people，什么时候换见 index.html 的 cnPeople），
+// 这里每人各数各的，报数多的那个。压脚的同学不会一下一下地躺下坐起，数不出来。1.9.1 以前一直只认一个人，模型常盯住跪着的压脚同学（比躺着的好认），做的学生就漏数了。
+// 谁是谁按髋部中点分：做的学生髋部贴着垫子不怎么动，压脚的同学在脚那头，隔着一两个躯干长。两个人对两份记数时，选两人髋部挪得最少的配法；
+// 只有一份记数时，离它半个躯干长以外的人另开一份（髋部贴着垫子，自己挪不了这么远）。只给一个人（没有 people）时和以前一样。
+function eachPerson(kind,make){
+ const T=[]; // 每人一份：c 记数，hp 髋部中点，t 最后看到的时刻，o 那一帧的结果
+ const hip=(l,asp)=>mid(pt(l,23,asp),pt(l,24,asp)),most=()=>T.reduce((n,k)=>Math.max(n,k.c.count),0),d=(p,k)=>len(sub(p.hp,k.hp));
+ const score=(k,t)=>k.c.count*4+(k.t===t&&k.o.ok?(k.o.hint?1:2):0); // 先看数，一样多时看这一帧看清了的
+ return {kind,get count(){return most()},
+  push(lm,t,asp=1,balls,people){const before=most(),P=(people||(lm?[lm]:[])).slice(0,2).map(l=>{const hp=hip(l,asp);return {l,hp,L:len(sub(mid(pt(l,11,asp),pt(l,12,asp)),hp))}}).filter(p=>p.L>0);let pairs=[];
+   if(T.length===2&&P.length===2)pairs=d(P[0],T[1])+d(P[1],T[0])<d(P[0],T[0])+d(P[1],T[1])?[[P[0],T[1]],[P[1],T[0]]]:[[P[0],T[0]],[P[1],T[1]]];
+   else if(T.length===2&&P.length===1)pairs=[[P[0],d(P[0],T[0])<=d(P[0],T[1])?T[0]:T[1]]];
+   else for(const p of [...P].sort((a,b)=>T.length?d(a,T[0])-d(b,T[0]):0))pairs.push([p,T.find(k=>!pairs.some(x=>x[1]===k)&&d(p,k)<p.L/2)]);
+   for(let [p,k] of pairs){if(!k){if(T.length>=2)continue;k={c:make()};T.push(k)}k.hp=p.hp;k.t=t;k.o=k.c.push(p.l,t,asp,balls)}
+   const n=most(),top=T.reduce((a,b)=>a&&score(a,t)>=score(b,t)?a:b,null),o=top&&top.t===t?top.o:{ok:false,hint:P.length?'没看清':'没看到人'};
+   // people：分出了几个人；gone：最早那个人多久没出现了。页面只认一个人时多出一个人、最早那个人又不见了，说明模型换了人
+   return {...o,count:n,bumped:n>before,people:T.length,gone:T.length?t-T[0].t:0}},
+  reset(){T.length=0}};
 }
 // 颠球：除了身体关键点，还要页面每帧认出的球（可能有几个，{x,y,r}：x 按画面宽、y 和半径 r 按画面高，都是 0–1）。
 // 球的高度 = 最低的脚点（当作地面）到球底的竖直距离，按躯干长度归一化。球往下落、到了最低点又抬起来，就是被碰了一下（脚、大腿、头都算）；
@@ -150,12 +169,14 @@ function dribbleCounter(){
    return {count,ok:true,bumped,ball,value:h,hint:count?'':'开始运球'}},
   reset(){count=0;lastT=scale=ground=h=ext=prev=wh=wext=null;down=wdown=byHand=false;touch=true;extT=top=0;hist=[];iv=[];wait=[];last=seenT=wT=-1e9}};
 }
+// 躺着：肩膀中点到髋部中点那条线离水平不到 35 度（手机正着拍才准）。仰卧起坐开始前，页面用它看画面里那个人是不是躺着等的学生
+function lying(lm,asp=1){if(!lm)return false;const d=sub(mid(pt(lm,11,asp),pt(lm,12,asp)),mid(pt(lm,23,asp),pt(lm,24,asp))),L=len(d);return L>0&&Math.abs(d.y)/L<0.57}
 const oneSide=pairs=>lm=>{if(!lm)return null;const ids=side(lm,pairs);return ids.every(i=>seen(lm,i))?ids:null};
 const bothSides=ids=>lm=>lm&&ids.every(i=>seen(lm,i))?ids:null;
 const MAKERS={
  rope:ropeCounter,
  // 髋部夹角（肩-髋-膝）：躺平约 135°，起身碰膝约 50–75°
- situp:()=>angleCounter('situp',{need:oneSide([[11,23,25],[12,24,26]]),measure:(lm,[a,b,c],asp)=>angle(pt(lm,a,asp),pt(lm,b,asp),pt(lm,c,asp)),rest:['>',115],act:['<',80]}),
+ situp:()=>eachPerson('situp',()=>angleCounter('situp',{need:oneSide([[11,23,25],[12,24,26]]),measure:(lm,[a,b,c],asp)=>angle(pt(lm,a,asp),pt(lm,b,asp),pt(lm,c,asp)),rest:['>',115],act:['<',80]})),
  // 两臂上举角度（髋-肩-腕）的平均：放下约 20°，举过头顶约 160°
  jack:()=>angleCounter('jack',{need:bothSides([11,12,15,16,23,24]),measure:(lm,_,asp)=>(angle(pt(lm,23,asp),pt(lm,11,asp),pt(lm,15,asp))+angle(pt(lm,24,asp),pt(lm,12,asp),pt(lm,16,asp)))/2,rest:['<',60],act:['>',130]}),
  // 膝盖夹角（髋-膝-踝）：站直约 175°，蹲到大腿水平约 90°
@@ -164,6 +185,6 @@ const MAKERS={
  dribble:dribbleCounter
 };
 function createCounter(kind){const m=MAKERS[kind];if(!m)throw Error('不认识的项目：'+kind);return m()}
-const api={ACTIONS,LINES,POINTS,angle,createCounter};
+const api={ACTIONS,LINES,POINTS,angle,lying,createCounter};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.PECount=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

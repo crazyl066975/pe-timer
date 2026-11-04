@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.9.1';
+const LS='pe-assistant-v1',APP_VER='1.9.2';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -324,6 +324,14 @@ function poseInit(){if(pose)return Promise.resolve(pose);return poseWait??=(asyn
  if(!await Vision.FilesetResolver.isSimdSupported())throw Error('这台手机的系统浏览器内核太旧，用不了 AI 计数。到应用商店更新「Android System WebView」后再试。');
  const files={wasmLoaderPath:B+'vision_wasm_internal.js',wasmBinaryPath:B+'vision_wasm_internal.wasm'},opt=d=>({baseOptions:{modelAssetPath:B+'pose_landmarker_lite.task',delegate:d},runningMode:'VIDEO',numPoses:1});
  try{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('GPU'));poseDev='显卡'}catch{pose=await Vision.PoseLandmarker.createFromOptions(files,opt('CPU'));poseDev='芯片'}return pose})().catch(e=>{poseWait=null;throw e})}
+// 一次认几个人。仰卧起坐体测有同学压脚：只认一个人时，模型常盯住跪着的压脚同学（比躺着的好认），做的学生就漏数了；
+// 可画面里只有一个人还让模型认两个，它每帧都重新找人，认不准（假相机上躺着的小人一个都数不出来）。所以先认一个人：
+// 等开始时，认到的人 1 秒都不是躺着的（多半盯上了压脚的同学），改认两个，counter.js 里每人各数各的；认两个时 1 秒里只看到一个躺着的学生，改回一个；
+// 数的时候认一个人，认到的人突然换了地方（counter.js 里多出一个人、原来那个人 0.4 秒没出现），也改认两个。别的项目都认一个。换不了就照旧认 1 个
+let poseN=1,cnSw=0;async function cnPeople(n){if(n===poseN)return;poseN=n;cnSw=0;try{await pose.setOptions({numPoses:n})}catch{}}
+function cnWho(ppl,o,asp,now){if(!(cnAct().people>1)||!ppl)return;const one=ppl.length===1,lie=one&&PECount.lying(ppl[0],asp);
+ if(cn.phase==='run'){if(poseN===1&&o?.people>1&&o.gone>=400)cnPeople(2);return}if(cn.phase!=='ready')return;
+ const want=poseN===1?(one&&!lie?2:0):(lie?1:0);cnSw=want?cnSw||now:0;if(cnSw&&now-cnSw>=1000)cnPeople(want)}
 // 交给认人模型前先把画面缩到长边 480（模型自己只看 256×256），手机相机给的画面很大时省下搬运时间
 const cnPoseCv=document.createElement('canvas');
 function cnPoseImg(v){const vw=v.videoWidth,vh=v.videoHeight,k=480/Math.max(vw,vh);if(k>=1)return v;const w=Math.round(vw*k),h=Math.round(vh*k);if(cnPoseCv.width!==w||cnPoseCv.height!==h){cnPoseCv.width=w;cnPoseCv.height=h}cnPoseCv.getContext('2d').drawImage(v,0,0,w,h);return cnPoseCv}
@@ -368,7 +376,7 @@ function cnPick(){if(cnBusy())return;const m=cnAct().metric,list=S().students;
 function cnNext(){const list=S().students,i=list.findIndex(s=>s.id===cn.sid),m=cn.dur===60?cnAct().metric||'':'';const rest=[...list.slice(i+1),...list.slice(0,Math.max(0,i))];
  cn.sid=(rest.find(s=>!(m&&s.req?.includes(m)&&valOf(s,m)!==undefined&&valOf(s,m)!==''))||{}).id||''}
 async function cnOpen(){if(cn.phase!=='idle')return;cn.err='';cn.phase='loading';draw();
- try{await poseInit();if(cnAct().ball)await ballInit()}catch(e){cn.phase='idle';cn.err=/内核/.test(e.message)?e.message:'AI 模型没有加载成功（'+e.message+'），关掉 App 再打开试试';draw();return}
+ try{await poseInit();await cnPeople(1);if(cnAct().ball)await ballInit()}catch(e){cn.phase='idle';cn.err=/内核/.test(e.message)?e.message:'AI 模型没有加载成功（'+e.message+'），关掉 App 再打开试试';draw();return}
  if(tab!=='count'||cn.phase!=='loading')return;if(!await cnCam()){cn.phase='idle';draw();return}cn.phase='ready';draw();cnLoop()}
 async function cnCam(){cnStream?.getTracks().forEach(t=>t.stop());cnStream=null;const v={facingMode:cn.front?'user':'environment',width:{ideal:960},height:{ideal:720},frameRate:{ideal:30}};
  try{cnStream=await navigator.mediaDevices.getUserMedia({video:v,audio:cn.rec})}catch{try{cnStream=await navigator.mediaDevices.getUserMedia({video:v,audio:false})}catch{toast('打不开相机，请在手机设置里允许「体育助手」使用相机');return false}}
@@ -381,11 +389,11 @@ function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCall
  const dog=setInterval(()=>{if(cnStream!==me){clearInterval(dog);return}if(rvfc&&!document.hidden&&performance.now()-lastStep>600){rvfc=false;next()}},500);
  const step=(_,meta)=>{if(cnStream!==me||!me||(meta&&!rvfc))return;next();const now=performance.now();lastStep=now;if(!rvfc){if(now-lastRun<30)return;lastRun=now}if(!v.videoWidth||v.readyState<2)return;
   // 颠球、运球数的是球，人只用来定地面、身高和手在哪，隔一帧认一次就够，省下的时间多认球；计数用这一帧画面出来的时间，不受认得快慢影响
-  const isBall=cnAct().ball,pt=meta?.presentationTime,ft=cnFt=Math.max(cnFt+1,pt>now-500&&pt<=now?pt:now);let lm=cnLm,balls=[];
-  if(!isBall||!lm||now-cnPoseT>=60){lm=null;const a=performance.now();try{cnTs=Math.max(cnTs+1,Math.round(now));lm=pose.detectForVideo(cnPoseImg(v),cnTs).landmarks?.[0]||null}catch{}cnLm=lm;cnPoseT=now;dp+=performance.now()-a;np++}frames++;
+  const isBall=cnAct().ball,pt=meta?.presentationTime,ft=cnFt=Math.max(cnFt+1,pt>now-500&&pt<=now?pt:now);let lm=cnLm,balls=[],ppl=null;
+  if(!isBall||!lm||now-cnPoseT>=60){lm=null;const a=performance.now();try{cnTs=Math.max(cnTs+1,Math.round(now));ppl=pose.detectForVideo(cnPoseImg(v),cnTs).landmarks||[];lm=ppl[0]||null}catch{}cnLm=lm;cnPoseT=now;dp+=performance.now()-a;np++}frames++;
   if(isBall&&ballDet){const a=performance.now();try{balls=cnBalls(v,lm)}catch{}db+=performance.now()-a;nb++}
-  if(cn.phase==='run'){const o=cnCounter.push(lm,ft,v.videoWidth/v.videoHeight,balls);cn.count=o.count;cnHint=o.hint||'';if(isBall)cnBall=o.ball||null;if(o.bumped){beep(1500,.035,.18);vibe(15)}if(o.ended){toast(`球落地了，这次颠了 ${o.count} 个`);cnFinish(false)}}
-  else{cnBall=balls[0]||null;cnHint=!lm?'没看到人，让学生站进画面里':isBall&&!cnBall?'把球放进画面里':''}
+  if(cn.phase==='run'){const o=cnCounter.push(lm,ft,v.videoWidth/v.videoHeight,balls,ppl);cnWho(ppl,o,v.videoWidth/v.videoHeight,now);cn.count=o.count;cnHint=o.hint||'';if(isBall)cnBall=o.ball||null;if(o.bumped){beep(1500,.035,.18);vibe(15)}if(o.ended){toast(`球落地了，这次颠了 ${o.count} 个`);cnFinish(false)}}
+  else{cnBall=balls[0]||null;cnHint=!lm?'没看到人，让学生站进画面里':isBall&&!cnBall?'把球放进画面里':'';cnWho(ppl,null,v.videoWidth/v.videoHeight,now)}
   cnTrk=cnBall?[cnBall,cnTrk[0]]:[];
   if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':cnAct().ball&&cnFps<15?' · 偏慢，可能漏数':'')
    // 慢的时候写出慢在哪：相机给的画面多大、每秒几帧，认人、认球各要几毫秒，用的显卡还是芯片（截图发过来就能看出来）

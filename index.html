@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.9';
+const LS='pe-assistant-v1',APP_VER='1.9.1';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -303,9 +303,9 @@ async function vidMsg(m){const v=vids.find(x=>x.vid===m.vid);if(!v)return;
  if(m.t==='vok'){v.acked.add(m.i);inflight.delete(m.vid+':'+m.i);vidPump()}
  else if(m.t==='vdone'){v.done=true;v.acked=new Set(Array.from({length:v.n},(_,i)=>i));await vstore('del',v.vid).catch(()=>{});toast(`「${v.title}」已传到电脑`);vibe(40)}
  if(tab==='video'&&!camStream){const now=Date.now();if(!vidMsg.t||now-vidMsg.t>400||m.t==='vdone'){vidMsg.t=now;draw()}}}
-// ======== AI 计数：摄像头看学生做动作，自动数跳绳、仰卧起坐、开合跳、深蹲、颠球、原地运球；保存后成绩和带骨架线的视频传到电脑 ========
+// ======== AI 计数：摄像头看学生做动作，自动数跳绳、仰卧起坐、开合跳、深蹲、颠球、原地运球；保存后成绩和视频传到电脑 ========
 // 识别全在手机上做（MediaPipe 姿态模型，打包在 vendor/mediapipe），画面不发给任何服务器；点「保存」后才经加密通道传到配对的电脑。
-// 画面先画到一块常驻的 canvas 上（视频帧 + 骨架 + 次数 + 计时），录像录的就是这块 canvas，所以视频里带着骨架线和计数。
+// 画面先画到一块常驻的 canvas 上（视频帧 + 次数 + 计时），录像录的就是这块 canvas，所以视频里带着计数和计时（1.9.1 起不画骨架线）。
 const CN_DUR=[[30,'30 秒'],[60,'1 分钟'],[0,'不限时']],CN_MAX=180,NUMF='"DIN Alternate","Bahnschrift","Helvetica Neue",sans-serif';
 let cn={act:'rope',dur:60,rec:true,front:false,sid:'',phase:'idle',count:0,adj:0,t0:0,end:0,full:false,err:''};
 try{const o=JSON.parse(localStorage.getItem(LS+'-cn'))||{};for(const k of ['act','dur','rec','front'])if(k in o)cn[k]=o[k];if(!PECount.ACTIONS[cn.act])cn.act='rope'}catch{}
@@ -351,7 +351,7 @@ function countPage(){const s=S();if(!s.students.length){$('app').innerHTML='<div
  if(cn.phase==='idle'||cn.phase==='loading'){
   $('app').innerHTML=`<section class="card"><div class="chips">${Object.entries(PECount.ACTIONS).map(([k,x])=>`<button class="${k===cn.act?'on':''}" onclick="cnSet('act','${k}')">${x.name}</button>`).join('')}</div>
   <div class="chips">时间：${CN_DUR.map(([d,l])=>`<button class="${d===cn.dur?'on':''}" onclick="cnSet('dur',${d})">${l}</button>`).join('')}</div>${who}
-  <label class="chk"><input type="checkbox" ${cn.rec?'checked':''} onchange="cn.rec=this.checked;cnKeep()">同时录像（带骨架线和计数），保存时一起传到电脑</label>
+  <label class="chk"><input type="checkbox" ${cn.rec?'checked':''} onchange="cn.rec=this.checked;cnKeep()">同时录像（带计数和计时），保存时一起传到电脑</label>
   <p class="muted">${esc(a.tip)}</p><button class="start" onclick="cnOpen()" ${cn.phase==='loading'?'disabled':''}>${cn.phase==='loading'?'正在加载 AI 模型…':'打开相机'}</button>
   ${cn.err?`<p style="color:var(--bad);margin:10px 0 0">${esc(cn.err)}</p>`:''}<p class="muted" style="margin:10px 0 0">动作识别在手机上完成，画面不上传。第一次打开要加载模型，等几秒。${a.ball?`${a.name}还要多加载一个认球模型（约 7MB）。`:''}${cn.dur?'':`不限时最长 ${CN_MAX/60} 分钟。`}</p></section>
   ${wait?`<p class="muted" style="text-align:center">还有 ${wait} 个视频在传，进度在「视频」里看</p>`:''}`;return}
@@ -390,15 +390,13 @@ function cnLoop(){const v=$('cnsrc'),me=cnStream;let rvfc='requestVideoFrameCall
   if(now-fpsT>=1000){cnFps=frames*1000/(now-fpsT);frames=0;fpsT=now;const f=$('cnfps');if(f)f.textContent=`识别 ${Math.round(cnFps)} 帧/秒`+(cn.act==='rope'&&cnFps<18?' · 偏慢，快跳可能漏数':cnAct().ball&&cnFps<15?' · 偏慢，可能漏数':'')
    // 慢的时候写出慢在哪：相机给的画面多大、每秒几帧，认人、认球各要几毫秒，用的显卡还是芯片（截图发过来就能看出来）
    const g=$('cndiag'),st=me.getVideoTracks()[0]?.getSettings?.()||{};if(g)g.textContent=cnFps<20?`画面 ${v.videoWidth}×${v.videoHeight}${st.frameRate?` ${Math.round(st.frameRate)} 帧`:''} · 认人 ${np?Math.round(dp/np):'-'} 毫秒（${poseDev}）${isBall?` · 认球 ${nb?Math.round(db/nb):'-'} 毫秒（${ballDev}）`:''}`:'';dp=np=db=nb=0}
-  const h=$('cnhint');if(h)h.textContent=cnHint||(cn.phase==='run'?'正在数…':cnAct().tip);cnDraw(v)};
+  const h=$('cnhint');if(h)h.textContent=cnHint||(cn.phase==='run'?'正在数…':cn.phase==='ready'?`AI 看到学生${isBall?'和球':''}了，可以开始`:cnAct().tip);cnDraw(v)};
  next()}
 function cnDraw(v){const c=cnCanvas,g=c.getContext('2d'),vw=v.videoWidth,vh=v.videoHeight;
  if(!cnRec){const k=Math.min(1,720/Math.max(vw,vh)),w=Math.round(vw*k),h=Math.round(vh*k);if(c.width!==w||c.height!==h){c.width=w;c.height=h}}
- const w=c.width,h=c.height,u=w/100,lm=cnLm,on=p=>p&&(p.visibility??1)>=0.5,now=Date.now();
+ const w=c.width,h=c.height,u=w/100,now=Date.now();
+ // 画面上不画骨架线和球圈（1.9.1 起，老师觉得看着乱）：认人、认球照常在后台跑，画面下面那行字写「AI 看到学生了」「正在数…」
  g.save();if(cn.front){g.translate(w,0);g.scale(-1,1)}g.drawImage(v,0,0,w,h);
- if(lm){g.lineCap='round';g.lineWidth=Math.max(3,u*0.9);g.strokeStyle=cn.phase==='run'?'#22c3ee':'#ffffffb0';g.beginPath();for(const [a,b] of PECount.LINES){if(!on(lm[a])||!on(lm[b]))continue;g.moveTo(lm[a].x*w,lm[a].y*h);g.lineTo(lm[b].x*w,lm[b].y*h)}g.stroke();
-  g.fillStyle='#fbbf24';for(const i of PECount.POINTS){const p=lm[i];if(!on(p))continue;g.beginPath();g.arc(p.x*w,p.y*h,Math.max(3,u*0.9),0,7);g.fill()}}
- if(cnBall){g.strokeStyle='#f97316';g.lineWidth=Math.max(3,u*0.8);g.beginPath();g.arc(cnBall.x*w,cnBall.y*h,Math.max(cnBall.r*h,u*2.5),0,7);g.stroke()}
  g.restore();
  // 上面：次数和计时；下面：学生、项目、时间。全都画进画面，录下来的视频里也有
  const a=cnAct(),st=cnStu(),n=cn.count+(cn.phase==='done'?cn.adj:0);g.textBaseline='middle';g.fillStyle='#0a1222b8';g.fillRect(0,0,w,u*18);g.fillRect(0,h-u*9,w,u*9);

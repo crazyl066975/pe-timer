@@ -3,6 +3,12 @@
 // 所有内容用 AES-GCM 加密后才发出去，中转站只看得到乱码。手机和电脑共用这一份代码。
 (function(root){
 const BROKERS=['wss://broker-cn.emqx.io:8084/mqtt','wss://broker.emqx.io:8084/mqtt'];
+// 我们自己的中转站（443 端口，学校网络拦了 8084 也连得上，见 relay-server/README.md）。电脑同时连它和 EMQX，二维码里带上它的地址（&s=），
+// 新版手机扫到就先连它；老电脑的码没有 s，手机照旧只连 EMQX。所以新旧电脑、新旧手机怎么搭配都碰得上头。
+const OWN=['wss://124.222.116.36/mqtt'];
+const okHost=h=>typeof h==='string'&&/^[a-z0-9.-]{1,80}(:\d{2,5})?$/i.test(h);
+const phoneUrls=s=>okHost(s)?[`wss://${s}/mqtt`,...BROKERS]:BROKERS;
+const linkExtra=()=>OWN.length?'&s='+new URL(OWN[0]).host:'';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const b64u={to:b=>{let s='';for(const x of b)s+=String.fromCharCode(x);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')},
  from:s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))};
@@ -38,11 +44,14 @@ async function openRoom({room,key,side,onMsg,onState,urls}){
  if(!okRoom(room)||!okKey(key))throw Error('二维码不完整，请在电脑上重新扫码');
  const k=await crypto.subtle.importKey('raw',b64u.from(key),'AES-GCM',false,['encrypt','decrypt']);
  const mine=`pe-workbench/${room}/${side==='desk'?'d':'p'}`,theirs=`pe-workbench/${room}/${side==='desk'?'p':'d'}`;
- const c=mqtt({urls,topic:theirs,onState,onMessage:async(t,data)=>{if(t!==theirs||data.length<29||data.length>200000)return;
-  try{const msg=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:data.slice(0,12),additionalData:enc.encode(theirs)},k,data.slice(12))));if(msg&&typeof msg==='object')onMsg(msg)}catch{}}});
- return {async send(obj){const iv=rand(12),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode(mine)},k,enc.encode(JSON.stringify(obj))));const out=new Uint8Array(12+ct.length);out.set(iv);out.set(ct,12);return c.publish(mine,out)},
-  close:()=>c.close(),get up(){return c.up}};
+ const onMessage=async(t,data)=>{if(t!==theirs||data.length<29||data.length>200000)return;
+  try{const msg=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:data.slice(0,12),additionalData:enc.encode(theirs)},k,data.slice(12))));if(msg&&typeof msg==='object')onMsg(msg)}catch{}};
+ // 电脑：每个中转站各连一条、一直连着，手机连的是哪个都收发得到；发的时候每条都发一份（手机只连一个，只收到一份）。手机：一个一个试，连上哪个用哪个
+ let up=false,cs=[];
+ cs=side==='desk'?(urls||[...OWN,...BROKERS]).map(u=>mqtt({urls:[u],topic:theirs,onMessage,onState:()=>{const v=cs.some(c=>c.up);if(v!==up){up=v;onState?.(v)}}})):[mqtt({urls,topic:theirs,onState,onMessage})];
+ return {async send(obj){const iv=rand(12),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode(mine)},k,enc.encode(JSON.stringify(obj))));const out=new Uint8Array(12+ct.length);out.set(iv);out.set(ct,12);let ok=false;for(const c of cs)ok=c.publish(mine,out)||ok;return ok},
+  close:()=>cs.forEach(c=>c.close()),get up(){return cs.some(c=>c.up)}};
 }
-const api={BROKERS,newRoom,openRoom,okRoom,okKey,packet};
+const api={BROKERS,OWN,phoneUrls,linkExtra,newRoom,openRoom,okRoom,okKey,packet};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.PERelay=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

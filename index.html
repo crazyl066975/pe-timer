@@ -88,7 +88,7 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.9.2';
+const LS='pe-assistant-v1',APP_VER='1.9.3';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -102,12 +102,12 @@ const vibe=ms=>{try{navigator.vibrate?.(ms)}catch{}};
 const S=()=>D.session||{className:'',classes:[],metrics:[],items:[],students:[],plan:{times:[],week:{},lessons:[]}};
 // ======== 连接电脑 ========
 const online=()=>!!room?.up&&Date.now()-lastPong<25000;
-function parseLink(txt){try{const h=String(txt).split('#')[1]||'',p=new URLSearchParams(h),r=p.get('r'),k=p.get('k');return PERelay.okRoom(r)&&PERelay.okKey(k)?{room:r,key:k}:null}catch{return null}}
+function parseLink(txt){try{const h=String(txt).split('#')[1]||'',p=new URLSearchParams(h),r=p.get('r'),k=p.get('k');return PERelay.okRoom(r)&&PERelay.okKey(k)?{room:r,key:k,srv:p.get('s')||''}:null}catch{return null}}
 async function pair(link){const p=parseLink(link);if(!p){toast('这不是工作台的连接码');return false}
  if(D.room&&D.room!==p.room&&D.queue.length&&!confirm(`还有 ${D.queue.length} 条没传到电脑，换电脑后这些会丢掉，确定？`))return false;
- D={room:p.room,key:p.key,session:D.room===p.room?D.session:null,queue:D.room===p.room?D.queue:[],done:D.room===p.room?D.done:{},ended:(D.ended||[]).filter(r=>r!==p.room)};persist();await connect();tab='today';draw();toast('已连接，正在同步课表…');if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))setTimeout(()=>toast('点下方「分享」→「添加到主屏幕」，以后像 App 一样打开'),3500);return true}
+ D={room:p.room,key:p.key,srv:p.srv,session:D.room===p.room?D.session:null,queue:D.room===p.room?D.queue:[],done:D.room===p.room?D.done:{},ended:(D.ended||[]).filter(r=>r!==p.room)};persist();await connect();tab='today';draw();toast('已连接，正在同步课表…');if(!standalone&&/iPhone|iPad/.test(navigator.userAgent))setTimeout(()=>toast('点下方「分享」→「添加到主屏幕」，以后像 App 一样打开'),3500);return true}
 async function connect(){room?.close();room=null;if(!D.room)return;
- try{room=await PERelay.openRoom({room:D.room,key:D.key,side:'phone',onMsg,onState:up=>{if(up){room.send({t:'hello'});flush()}head()}})}catch(e){toast(e.message)}}
+ try{room=await PERelay.openRoom({room:D.room,key:D.key,side:'phone',urls:PERelay.phoneUrls(D.srv),onMsg,onState:up=>{if(up){room.send({t:'hello'});flush()}head()}})}catch(e){toast(e.message)}}
 function onMsg(m){lastPong=Date.now();
  if(m.t==='session'){const had=!!D.session;D.session=m;delete m.t;persist();if(!had)toast('课表和名单已同步');overlay();draw()}
  else if(m.t==='pong'){}

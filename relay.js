@@ -52,6 +52,6 @@ async function openRoom({room,key,side,onMsg,onState,urls}){
  return {async send(obj){const iv=rand(12),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode(mine)},k,enc.encode(JSON.stringify(obj))));const out=new Uint8Array(12+ct.length);out.set(iv);out.set(ct,12);let ok=false;for(const c of cs)ok=c.publish(mine,out)||ok;return ok},
   close:()=>cs.forEach(c=>c.close()),get up(){return cs.some(c=>c.up)}};
 }
-const api={BROKERS,OWN,phoneUrls,linkExtra,newRoom,openRoom,okRoom,okKey,packet};
+const api={BROKERS,OWN,phoneUrls,linkExtra,newRoom,openRoom,okRoom,okKey,packet,mqtt};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.PERelay=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

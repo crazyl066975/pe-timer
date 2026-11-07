@@ -1,6 +1,6 @@
 // 网页版离线缓存：先用缓存打开（操场信号差也能秒开），同时后台向服务器确认有没有新版；页面有新版就通知页面自己刷新
 // AI 计数的模型（vendor/mediapipe，约 20MB）不预先下载，第一次打开「计数」时才下载，之后同样走缓存
-const C='pe-assistant-v6',FILES=['./','index.html','relay.js','counter.js','jsQR.js','manifest.json','icon-192.png','icon-512.png'];
+const C='pe-assistant-v7',FILES=['./','index.html','relay.js','talk.js','qrcode.js','counter.js','jsQR.js','manifest.json','icon-192.png','icon-512.png'];
 // 页面换了新版：先把其余几个文件也换成新的，再通知页面刷新，免得刷出来是新页面配旧的 counter.js（1.6 就因此看不到颠球）
 const fresh=(c,skip)=>Promise.all(FILES.map(f=>new URL(f,location).href).filter(f=>f!==skip).map(f=>fetch(f,{cache:'no-cache'}).then(r=>r.ok&&c.put(f,r)).catch(()=>{})));
 // 这几个文件交给页面时标上「每次都要确认」：不然浏览器会把旧的 counter.js 留在内存里，刷新后接着用（服务器给的是 10 分钟有效）

@@ -46,7 +46,7 @@ textarea{min-height:70px}
 .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;background:#ffffff22;margin-left:6px;vertical-align:2px}
 .lesson{white-space:pre-wrap;font-size:15px;line-height:1.7;background:#0f1a30;border-radius:14px;padding:12px;margin-top:10px;-webkit-user-select:text;user-select:text}
 .week{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}.week th,.week td{border:1px solid var(--line);padding:4px;vertical-align:top;word-break:break-all}.week th{color:var(--muted);font-weight:500}.week td.today{background:#17345a}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(7,1fr);background:#0d1629ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 6px max(6px,env(safe-area-inset-bottom));z-index:5}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(8,1fr);background:#0d1629ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 6px max(6px,env(safe-area-inset-bottom));z-index:5}
 nav[hidden]{display:none}
 nav button{background:none;display:grid;justify-items:center;gap:1px;padding:6px 0;font-size:12px;color:var(--muted)}nav button i{font-style:normal;font-size:21px;line-height:1.1}nav button.on{color:#fff}nav button.on i{color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#000d;padding:10px 18px;border-radius:99px;font-size:15px;display:none;z-index:9;max-width:90vw;text-align:center}
@@ -73,22 +73,46 @@ dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 .cnt-res{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 8px}.cnt-res b{font:700 72px/1 var(--num);min-width:2.2em;text-align:center;font-variant-numeric:tabular-nums}.cnt-res button{width:58px;height:58px;font:700 28px var(--num);border-radius:16px;background:#ffffff1a}
 .cnwho{width:100%;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;margin:4px 0 10px}
 .chk{display:flex;gap:8px;align-items:center;font-size:15px;margin:4px 0}.chk input{width:22px;height:22px;flex:0 0 auto}
+/* 同事对讲：开关、圆形「按住说话」、每一页底下的对讲栏 */
+.tk-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.tk-sw{display:flex;align-items:center;gap:8px;padding:7px 14px 7px 7px;border-radius:99px;background:#ffffff12;font-size:15px;font-weight:700;color:var(--muted);flex:0 0 auto}
+.tk-sw i{width:46px;height:28px;border-radius:99px;background:#475569;position:relative;transition:background .2s}.tk-sw i::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0006;transition:left .2s}
+.tk-sw.on{color:#d1fae5}.tk-sw.on i{background:var(--ok)}.tk-sw.on i::after{left:21px}
+.ptt{display:grid;place-items:center;width:min(64vw,236px);height:min(64vw,236px);margin:4px auto 16px;border-radius:50%;background:radial-gradient(circle at 50% 30%,#5b93ff,#1f4fd6 70%);box-shadow:0 0 0 calc(6px + var(--lv,0)*22px) #2f6bff33,0 16px 34px -14px #2f6bffcc;color:#fff;touch-action:none;-webkit-touch-callout:none;transition:box-shadow .08s}
+.ptt b{display:block;font-size:25px}.ptt small{display:block;font-size:13px;opacity:.85;margin-top:4px}
+.ptt.tx{background:radial-gradient(circle at 50% 30%,#ff7a90,#d91f4a 70%);box-shadow:0 0 0 calc(6px + var(--lv,0)*26px) #fb718544,0 16px 34px -14px #d91f4acc}
+.ptt.rx{background:radial-gradient(circle at 50% 30%,#3ee0c8,#0e7490 72%);animation:tkp 1.2s infinite}.ptt.wait{background:#26345a;color:var(--muted);box-shadow:none}
+@keyframes tkp{0%,100%{box-shadow:0 0 0 8px #22c3ee22}50%{box-shadow:0 0 0 20px #22c3ee11}}
+.tk-qr{background:#fff;border-radius:14px;padding:8px;width:min(70vw,270px);margin:0 auto}.tk-qr svg{display:block;width:100%;height:auto}
+.tbar{position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));bottom:calc(66px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;padding:7px 7px 7px 14px;background:#172a52f2;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid #2f4677;border-radius:18px;z-index:6;box-shadow:0 12px 30px -14px #000}
+.tbar[hidden]{display:none}body.nonav .tbar{bottom:calc(12px + env(safe-area-inset-bottom))}
+.tb-info{flex:1;min-width:0;display:grid;text-align:left;background:none;padding:2px 0;border-radius:10px}.tb-info b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tb-info span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-ptt{flex:0 0 auto;padding:13px 16px;font-size:16px;font-weight:800;background:var(--primary);color:#fff;touch-action:none;-webkit-touch-callout:none;box-shadow:0 0 0 calc(var(--lv,0)*10px) #fb718566}
+.tb-ptt.tx{background:#e11d48}.tb-ptt.rx{background:#0e7490}.tb-ptt.wait{background:#26345a;color:var(--muted)}
+.tb-off{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:#ffffff14;color:var(--muted);font-size:15px}
+body.talkon{padding-bottom:calc(140px + env(safe-area-inset-bottom))}body.talkon.nonav{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+body.talkon .toast{bottom:calc(150px + env(safe-area-inset-bottom))}body.talkon.nonav .toast{bottom:calc(92px + env(safe-area-inset-bottom))}
+.rxdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;animation:bl 1s infinite;vertical-align:1px}
+@media(prefers-reduced-motion:reduce){.ptt.rx,.rxdot{animation:none}}
 </style></head><body>
 <header id="head"></header>
 <div id="apkUpd" class="card" hidden style="border-color:var(--primary)"></div>
 <main id="app"></main>
 <nav id="nav" hidden></nav>
+<div class="tbar" id="tbar" hidden><button class="tb-info" onclick="go('talk')"><b id="tbT"></b><span id="tbS"></span></button><button class="tb-ptt" id="tbP" onpointerdown="pttDown(event)" oncontextmenu="return false">按住说话</button><button class="tb-off" onclick="talkStop();toast('对讲已关闭');if(tab==='talk')draw()" aria-label="关闭对讲">✕</button></div>
 <dialog id="dlg"><div class="pick" id="pick"></div><button class="ghost" style="width:100%;margin-top:10px" onclick="dlg.close()">取消</button></dialog>
 <div class="toast" id="toast"></div>
 <button class="upd" id="upd" hidden onclick="location.reload()">有新版本，点这里更新</button>
 <script src="relay.js"></script>
+<script src="talk.js"></script>
+<script src="qrcode.js"></script>
 <script src="counter.js"></script>
 <script src="jsQR.js"></script>
 <script>
 // ======== 体育助手（手机端）：和电脑上的「体育教师工作台」配对后，课表教案自动同步，计时/成绩/练习/视频直接传回电脑 ========
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS='pe-assistant-v1',APP_VER='1.9.3';
+const LS='pe-assistant-v1',APP_VER='1.9.4';
 {const d=document.getElementById('dlg');if(typeof d.showModal!=='function'){d.showModal=function(){this.setAttribute('open','');this.style.cssText='display:block;position:fixed;top:12vh;left:50%;transform:translateX(-50%);z-index:30;margin:0'};d.close=function(){this.removeAttribute('open');this.style.display='none'};Object.defineProperty(d,'open',{get(){return this.hasAttribute('open')}})}}
 let D={room:'',key:'',session:null,queue:[],done:{},ended:[]};try{Object.assign(D,JSON.parse(localStorage.getItem(LS))||{})}catch{}
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch{toast('手机存储空间不够了')}};
@@ -127,9 +151,9 @@ const valOf=(s,k)=>{const p=D.done[s.id+'|'+k];if(p!==undefined&&D.queue.some(q=
 const pendingOf=(s,k)=>D.queue.some(q=>q.t==='score'&&q.id===s.id&&q.metric===k);
 function sendScore(s,k,v){D.done[s.id+'|'+k]=v;enqueue({t:'score',id:s.id,metric:k,value:v});beep(1200,.06,.25);vibe(30)}
 // ======== 顶部和底部 ========
-function head(){if(!D.room){$('head').innerHTML='';return}const s=S(),n=D.queue.length+vids.filter(v=>!v.done).length;
- $('head').innerHTML=`<div><h1>${tab==='today'?'今天的课':{timer:'计时',score:'记成绩',practice:'课堂练习',count:'AI 计数',video:'拍视频',ai:'AI 助手'}[tab]}</h1><div class="st"><span class="dot ${online()?'on':room?.up?'wait':''}"></span>${online()?'已连上电脑':room?.up?'电脑没开或没联网':'手机没网'}${n?` · ${n} 条待传`:''}</div></div>${tab==='today'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="moreMenu()">⋯</button>':tab==='ai'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="aiClear()">清空</button>':`<button class="ghost" style="padding:9px 12px;font-size:14px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="pickClass()">${esc(s.className||'选择班级')} ▾</button>`}`}
-const TABS=[['today','▦','今天'],['timer','⏱','计时'],['score','✎','成绩'],['practice','↻','练习'],['count','◎','计数'],['video','●','视频'],['ai','✨','AI']];
+function head(){if(!D.room){$('head').innerHTML=tab==='talk'?'<div><h1>同事对讲</h1><div class="st">不用连电脑也能用</div></div><button class="ghost" style="padding:9px 12px;font-size:14px" onclick="go(\'today\')">返回</button>':'';return}const s=S(),n=D.queue.length+vids.filter(v=>!v.done).length;
+ $('head').innerHTML=`<div><h1>${tab==='today'?'今天的课':{timer:'计时',score:'记成绩',practice:'课堂练习',count:'AI 计数',video:'拍视频',ai:'AI 助手',talk:'同事对讲'}[tab]}</h1><div class="st"><span class="dot ${online()?'on':room?.up?'wait':''}"></span>${online()?'已连上电脑':room?.up?'电脑没开或没联网':'手机没网'}${n?` · ${n} 条待传`:''}</div></div>${tab==='today'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="moreMenu()">⋯</button>':tab==='ai'?'<button class="ghost" style="padding:9px 12px;font-size:14px" onclick="aiClear()">清空</button>':tab==='talk'?'':`<button class="ghost" style="padding:9px 12px;font-size:14px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="pickClass()">${esc(s.className||'选择班级')} ▾</button>`}`}
+const TABS=[['today','▦','今天'],['timer','⏱','计时'],['score','✎','成绩'],['practice','↻','练习'],['count','◎','计数'],['video','●','视频'],['ai','✨','AI'],['talk','☏','对讲']];
 function nav(){const n=$('nav');n.hidden=!D.room;n.innerHTML=TABS.map(([k,i,l])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')"><i>${i}</i>${l}</button>`).join('')}
 function go(k){if(running||cdEnd){toast('先停止计时再切换');return}if(cnBusy()){toast('先结束计数再切换');return}stopCam();if(k!=='count')cnClose();tab=k;draw();scrollTo(0,0)}
 function pickClass(){const s=S();if(!s.classes.length){toast('电脑上还没有班级');return}
@@ -140,14 +164,15 @@ function unpair(){if(D.queue.length&&!confirm(`还有 ${D.queue.length} 条没�
 // ======== 欢迎页 + 扫码 ========
 function welcome(){$('app').innerHTML=`<div class="welcome"><img class="logo" src="icon-192.png" alt=""><h1>体育助手</h1><p class="muted">和电脑上的「体育教师工作台」配对后，<br>打开就能看今天的课，计时、成绩、视频直接传到电脑。</p>
  <button class="start" style="margin-top:26px" onclick="scanStart()">扫码连接电脑</button>
+ <button class="ghost" style="width:100%;margin-top:12px" onclick="go('talk')">☏ 同事对讲（不用连电脑）</button>
  <p class="muted" style="margin-top:22px">在电脑上打开工作台 →「幸福工具」→「手机助手」→「开始连接手机」，<br>屏幕上会出现二维码。</p>
  <details style="margin-top:18px;text-align:left"><summary class="muted">扫不了码？</summary><p class="muted">在电脑二维码下方复制连接网址，粘贴到这里：</p><input id="lnk" placeholder="https://…#r=…"><button class="ghost" style="width:100%;margin-top:8px" onclick="pair($('lnk').value)">连接</button></details></div>`}
 let scanStream=null,scanRaf=0;
-async function scanStart(){try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})}catch{toast('打不开相机，请在手机设置里允许「体育助手」使用相机');return}
- const box=document.createElement('div');box.className='scan';box.id='scan';box.innerHTML='<video playsinline muted autoplay></video><div class="frame"></div><div class="tip">对准电脑上的二维码</div><button onclick="scanStop()">取消</button>';document.body.append(box);
+async function scanStart(kind){try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})}catch{toast('打不开相机，请在手机设置里允许「体育助手」使用相机');return}
+ const box=document.createElement('div');box.className='scan';box.id='scan';box.innerHTML='<video playsinline muted autoplay></video><div class="frame"></div><div class="tip">'+(kind==='talk'?'对准同事手机上的对讲二维码':'对准电脑上的二维码')+'</div><button onclick="scanStop()">取消</button>';document.body.append(box);
  const v=box.querySelector('video');v.srcObject=scanStream;const c=document.createElement('canvas'),g=c.getContext('2d',{willReadFrequently:true});
  const loop=()=>{if(!scanStream)return;if(v.videoWidth){const w=Math.min(720,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);c.width=w;c.height=h;g.drawImage(v,0,0,w,h);const r=jsQR(g.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'});
-  if(r?.data&&parseLink(r.data)){vibe(60);beep(1400,.08);scanStop();pair(r.data);return}}scanRaf=requestAnimationFrame(loop)};loop()}
+  if(r?.data&&parseLink(r.data)){vibe(60);beep(1400,.08);scanStop();pair(r.data);return}if(r?.data&&PETalk.parse(r.data)){vibe(60);beep(1400,.08);scanStop();talkInvite(r.data);return}}scanRaf=requestAnimationFrame(loop)};loop()}
 function scanStop(){cancelAnimationFrame(scanRaf);scanStream?.getTracks().forEach(t=>t.stop());scanStream=null;$('scan')?.remove()}
 // ======== 今天 ========
 const WD=['周一','周二','周三','周四','周五','周六','周日'];
@@ -487,10 +512,70 @@ async function apkUpdCheck(){if(!/androidplatform/.test(location.host))return;le
  apkUpdShow(s)}
 function apkUpdSkip(){const s=updLoad();s.skip=s.v;updKeep(s);$('apkUpd').hidden=true}
 setTimeout(apkUpdCheck,4000);
+// ======== 同事对讲（talk.js）：几个老师进同一个频道，按住说话，频道里的人手机上直接放出来；不用连电脑 ========
+// 开关关着时不连网、不开麦克风，也不会响；开着时别的页面底下有一条对讲栏：按住就能说，点 ✕ 关掉
+const TK=LS+'-talk';let TC={};try{TC=JSON.parse(localStorage.getItem(TK))||{}}catch{}
+const tcSave=()=>{try{localStorage.setItem(TK,JSON.stringify(TC))}catch{}};if(!TC.id){TC.id=PETalk.newId();tcSave()}
+let tch=null,tInv=null,tForm='',tWl=null,tHid=0,tRaf=0,tPaintQ=0,pttHeld=false,tAcHooked=null;
+function talkStart(){if(!TC.room||!TC.me)return;tch?.close();tch=PETalk.channel({room:TC.room,key:TC.key,srv:TC.srv,id:TC.id,me:TC.me,audio:ctx,onChange:talkUi});TC.on=true;tcSave();
+ const a=ctx();if(a!==tAcHooked){tAcHooked=a;a.addEventListener?.('statechange',talkUi)}talkWake();talkUi()}
+function talkStop(){pttHeld=false;tch?.close();tch=null;TC.on=false;tcSave();try{tWl?.release()}catch{}tWl=null;talkUi()}
+function talkToggle(){if(tch)talkStop();else talkStart();draw()}
+async function talkWake(){if(!tch||document.hidden||tWl)return;try{tWl=await navigator.wakeLock?.request('screen')||null;tWl?.addEventListener?.('release',()=>{tWl=null})}catch{tWl=null}} // 网页版对讲开着时屏幕不灭（App 本来就不灭）
+const talkUi=()=>{if(!tPaintQ)tPaintQ=requestAnimationFrame(talkPaint)};
+// 按钮和对讲栏上写什么
+function talkState(){const t=tch,rx=t.talker(),mx=t.tx,n=t.members().length+1,lock=!ac||ac.state!=='running',off=navigator.onLine===false;
+ if(mx==='on'){const s=Math.floor((Date.now()-t.txSince)/1000);return {cls:'tx',btn:'松手停',big:`正在说 ${s} 秒`,small:'松手就停',title:`正在说… ${s} 秒`,sub:'松手就发出去了'}}
+ if(mx==='wait')return {cls:'tx',btn:'准备…',big:'准备…',small:'在打开麦克风',title:'准备说话…',sub:'在打开麦克风'};
+ if(rx)return {cls:'rx',btn:'对方在说',big:`${rx.n}在说`,small:'等对方说完再按',title:`${rx.n}在说话…`,sub:lock?'点一下屏幕才听得到':TC.cname+' · 慢 1 秒左右'};
+ if(!t.up)return {cls:'wait',btn:'正在连',big:'正在连…',small:off?'手机没网':'连上中转站就能说',title:`${TC.cname} · 正在连…`,sub:off?'手机没网':'连上中转站就能说'};
+ return {cls:'',btn:'按住说话',big:'按住说话',small:'松手就停，一次最多 1 分钟',title:`${TC.cname} · ${n} 人在线`,sub:lock?'点一下屏幕，才听得到同事说话':'对讲开着，点这里看详情'}}
+// 只改字和颜色，不重画按钮：正按着的时候按钮不能换掉
+function talkPaint(){tPaintQ=0;const bar=$('tbar'),show=!!tch&&tab!=='talk';document.body.classList.toggle('talkon',show);document.body.classList.toggle('nonav',!D.room);bar.hidden=!show;if(!tch)return;const st=talkState();
+ if(show){$('tbT').innerHTML=(st.cls==='rx'?'<i class="rxdot"></i>':'')+esc(st.title);$('tbS').textContent=st.sub;const b=$('tbP');if(b.className!=='tb-ptt '+st.cls)b.className='tb-ptt '+st.cls;b.textContent=st.btn}
+ const p=$('ptt');if(tab==='talk'&&p){if(p.className!=='ptt '+st.cls)p.className='ptt '+st.cls;$('pttT').textContent=st.big;$('pttS').textContent=st.small;
+  $('tkst').innerHTML=`<span class="dot ${tch.up?'on':'wait'}"></span>${tch.up?'已连上':'正在连…'}`;const ms=tch.members();
+  $('tkmem').textContent=ms.length?`在线 ${ms.length+1} 人：我（${TC.me}）、${ms.map(m=>m.n).join('、')}`:'现在只有你在频道里：点下面「发给同事」邀请大家。';
+  const hh=talkHist();if(hh!==talkPaint.h){talkPaint.h=hh;$('tkhist').innerHTML=hh}}
+ if(tch.tx&&!tRaf)tRaf=requestAnimationFrame(talkLevel)}
+function talkLevel(){tRaf=0;if(!tch?.tx){$('ptt')?.style.removeProperty('--lv');$('tbP').style.removeProperty('--lv');return}tRaf=requestAnimationFrame(talkLevel);
+ const lv=tch.level.toFixed(2);$('ptt')?.style.setProperty('--lv',lv);$('tbP').style.setProperty('--lv',lv);if(Date.now()-(talkLevel.t||0)>250){talkLevel.t=Date.now();talkPaint()}}
+const talkHist=()=>tch?.hist.length?tch.hist.map((h,i)=>`<div class="vrow"><span><b>${esc(h.n)}</b> <span class="muted">${new Date(h.at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})} · ${Math.max(1,Math.round(h.dur))} 秒${h.missed?' · 当时没放出来':''}</span></span><button class="ghost" style="padding:7px 12px;font-size:14px;flex:0 0 auto" onclick="talkReplay(${i})">${tch.replaying===i?'■ 停':'▶ 重听'}</button></div>`).join(''):'<p class="muted" style="margin:0">同事说的话会列在这里，没听清可以重听。只存在这台手机上，关掉对讲就清空。</p>';
+const talkTips=()=>`<p class="muted" style="margin:14px 2px 0;font-size:13px;line-height:1.75">· 要开着体育助手、亮着屏、有网才收得到，锁屏或切到别的 App 就听不到。<br>· 说的话慢 1 秒左右才传到，发令起跑还是用哨子。<br>· 声音加密以后经中转站转给频道里的人，不保存，没进频道的人听不到。<br>· 操场太吵听不清时，戴一只蓝牙耳机最好。</p>`;
+function talkPage(){const a=$('app'),me=esc(TC.me||'');
+ if(tInv){a.innerHTML=`<section class="card"><h2>加入「${esc(tInv.cname)}」对讲</h2><p class="muted" style="margin:0 0 12px">同事邀请你进这个对讲频道：进去以后按住按钮说话，频道里的人手机上直接放出来。</p><label class="muted">你的称呼（同事会看到）</label><input id="tme" maxlength="8" placeholder="比如：李老师" value="${me}"><button class="start" style="margin-top:12px" onclick="talkJoin()">加入并打开对讲</button><button class="ghost" style="width:100%;margin-top:8px" onclick="tInv=null;draw()">不加入</button>${TC.room&&TC.room!==tInv.room?`<p class="muted" style="margin:10px 0 0">加入后会退出现在的「${esc(TC.cname)}」频道。</p>`:''}</section>${talkTips()}`;return}
+ if(!TC.room){a.innerHTML=tForm==='new'?`<section class="card"><h2>建一个对讲频道</h2><label class="muted">频道名字</label><input id="tcn" maxlength="12" value="体育组"><label class="muted" style="display:block;margin-top:10px">你的称呼（同事会看到）</label><input id="tme" maxlength="8" placeholder="比如：李老师" value="${me}"><button class="start" style="margin-top:12px" onclick="talkCreate()">建好了，打开对讲</button><button class="ghost" style="width:100%;margin-top:8px" onclick="tForm='';draw()">取消</button></section>`
+  :`<section class="card"><h2>同事对讲</h2><p class="muted" style="margin:0 0 12px">几个老师进同一个频道，按住说话，大家手机上直接放出来，像对讲机一样。不用连电脑。</p><button class="start" onclick="tForm='new';draw()">建一个频道</button><div class="row2"><button class="ghost" onclick="scanStart('talk')">扫码加入</button><button class="ghost" onclick="talkPaste()">粘贴邀请链接</button></div><p class="muted" style="margin:10px 0 0">一个人建好频道，把邀请发给同事；同事扫码或者点开邀请链接就进来了。</p></section>${talkTips()}`;return}
+ const on=!!tch,hh=on?talkHist():'';talkPaint.h=hh;
+ a.innerHTML=`<section class="card"><div class="tk-top"><div style="min-width:0"><h2 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(TC.cname)}</h2><div class="st" id="tkst">${on?'':'<span class="dot"></span>关着'}</div></div><button class="tk-sw ${on?'on':''}" role="switch" aria-checked="${on}" onclick="talkToggle()"><i></i>${on?'开着':'关着'}</button></div>
+  <p class="muted" id="tkmem" style="margin:10px 0 0">${on?'':'对讲关着：不连网、不开麦克风，也不会响。要用的时候点右上角的开关。'}</p></section>
+  ${on?`<button class="ptt" id="ptt" onpointerdown="pttDown(event)" oncontextmenu="return false"><span><b id="pttT"></b><small id="pttS"></small></span></button><section class="card"><h2>刚才的话</h2><div id="tkhist">${hh}</div></section>`:''}
+  <section class="card"><h2>邀请同事</h2><p class="muted" style="margin:0 0 4px">把邀请发到同事群，或者让同事用体育助手扫你的码。谁拿到邀请都能进，只发给同事。</p><div class="row2"><button class="ghost" onclick="talkQr()">显示二维码</button><button class="ghost" onclick="talkShare()">发给同事</button></div></section>
+  <div class="row2"><button class="ghost" onclick="talkRename()">改称呼（${me}）</button><button class="ghost" onclick="talkLeave()">退出频道</button></div>${talkTips()}`}
+function talkCreate(){const me=$('tme').value.trim().slice(0,8);if(!me){toast('先写上你的称呼');$('tme').focus();return}Object.assign(TC,PETalk.create($('tcn').value),{me});tForm='';tcSave();ctx();talkStart();draw();toast('频道建好了：点「发给同事」邀请大家')}
+function talkJoin(){const me=$('tme').value.trim().slice(0,8);if(!me){toast('先写上你的称呼');$('tme').focus();return}const v=tInv;tInv=null;Object.assign(TC,{room:v.room,key:v.key,srv:v.srv,cname:v.cname,me});tcSave();ctx();talkStart();draw();toast('进来了：按住按钮就能说话')}
+function talkInvite(txt){const v=PETalk.parse(txt);if(!v){toast('这不是对讲邀请');return}if(v.room===TC.room&&TC.me){if(!tch){ctx();talkStart()}toast('你已经在这个频道里了')}else tInv=v;tab='talk';draw()}
+function talkPaste(){$('pick').innerHTML=`<p style="margin:0 0 6px">把同事发来的邀请链接粘贴到这里：</p><input id="tpl" placeholder="https://…#tr=…"><button class="start" style="margin-top:10px" onclick="const v=$('tpl').value;dlg.close();talkInvite(v)">加入</button>`;$('dlg').showModal()}
+function talkQr(){const u=PETalk.link(TC);let svg='';try{const q=qrcode(0,'M');q.addData(u);q.make();svg=q.createSvgTag(5,2)}catch{}
+ $('pick').innerHTML=`<p style="margin:0 0 8px;text-align:center">同事打开体育助手 →「对讲」→「扫码加入」<br><span class="muted">也可以用手机相机扫</span></p><div class="tk-qr">${svg||'<p class="muted">生成不了二维码，请用「发给同事」</p>'}</div><p class="muted" style="text-align:center;margin:8px 0 0">${esc(TC.cname)} · 谁扫到都能进，只给同事扫</p>`;$('dlg').showModal()}
+async function talkShare(){const u=PETalk.link(TC),t=`进「${TC.cname}」对讲（体育助手）：`;
+ if(navigator.share)try{await navigator.share({title:'同事对讲',text:t,url:u});return}catch(e){if(e?.name==='AbortError')return}
+ try{await navigator.clipboard.writeText(t+u);toast('邀请已复制：粘贴到同事群里就行')}catch{prompt('复制这个邀请链接，发到同事群里：',u)}}
+function talkRename(){const n=prompt('你的称呼（同事会看到）：',TC.me||'');if(n===null)return;const v=n.trim().slice(0,8);if(!v)return;TC.me=v;tcSave();if(tch)talkStart();draw()}
+function talkLeave(){if(!confirm(`退出「${TC.cname}」频道？以后要再进，得让同事重新发一次邀请。`))return;talkStop();TC={id:TC.id,me:TC.me};tcSave();draw()}
+function talkReplay(i){if(!tch)return;if(tch.replaying===i){tch.stopReplay();talkPaint();return}const a=ctx();if(a.state==='running')tch.replay(i);else a.resume().then(()=>{tch?.replay(i);talkPaint()}).catch(()=>toast('放不出来，点一下屏幕再试'));talkPaint()}
+// 按住说话：手指移开按钮也算按着，松手（哪里松都算）才停
+function pttDown(e){e.preventDefault();if(!tch||pttHeld)return;pttHeld=true;try{e.currentTarget.setPointerCapture(e.pointerId)}catch{}ctx();vibe(25);
+ tch.startTalk(()=>pttHeld).then(r=>{const m={busy:`${tch?.talker()?.n||'同事'}在说，等对方说完`,offline:'还没连上中转站，等一下再说',mic:'打不开麦克风：请允许「体育助手」（或浏览器）使用麦克风',nomic:'这台手机没找到麦克风',cancel:'要按住不放，边按边说，说完再松手'}[r];if(m)toast(m);talkUi()})}
+function pttUp(){if(!pttHeld)return;pttHeld=false;tch?.stopTalk();talkUi()}
+addEventListener('pointerup',pttUp);addEventListener('pointercancel',pttUp);addEventListener('blur',pttUp);
+// 切到后台：松开按钮；回来时连接可能早断了，过了 20 秒就重连一次。苹果手机要点一下屏幕声音才放得出来
+document.addEventListener('visibilitychange',()=>{if(document.hidden){tHid=Date.now();pttUp();return}if(tch){if(tHid&&Date.now()-tHid>20000)tch.refresh();talkWake();talkUi()}});
+document.addEventListener('pointerdown',()=>{if(tch&&ac&&ac.state!=='running')try{ac.resume()}catch{}},true);
 // ======== 页面 ========
-function draw(soft){head();nav();if(!D.room){welcome();return}
- if(soft&&['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return; // 正在输入时不打断
- ({today,timer,score,practice,count:countPage,video,ai})[tab]()}
+function draw(soft){head();nav();if(!D.room)(tab==='talk'?talkPage:welcome)();
+ else if(!(soft&&['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)))({today,timer,score,practice,count:countPage,video,ai,talk:talkPage})[tab](); // 正在输入时不打断
+ talkPaint()}
 // 安卓 App 的返回键
 window.appBack=()=>{if($('scan')){scanStop();return true}if($('dlg').open){$('dlg').close();return true}if(tab==='count'&&cn.phase!=='idle'){if(cnBusy())toast('先点「结束」');else{cnClose();draw()}return true}if(tab!=='today'&&!running&&!cdEnd){go('today');return true}return false};
 document.addEventListener('click',()=>{try{navigator.wakeLock?.request('screen').catch(()=>{})}catch{}},{once:true});
@@ -499,13 +584,16 @@ setInterval(()=>{if(tab==='today'&&D.room&&!document.hidden&&document.activeElem
 // 网页版（iPhone 添加到主屏幕）：网址里带着连接码就直接配对，然后把它从地址栏去掉
 // iPhone 在 Safari 里先别去掉 # 后面的连接码：这样「添加到主屏幕」以后，桌面图标打开就自动连上
 const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||/androidplatform/.test(location.host);
+// 网址里带着对讲邀请（#tr=…）：去「对讲」页问要不要加入（已经在这个频道里就直接打开），然后把邀请从地址栏去掉；上次对讲开着，这次接着开
+{const ti=PETalk.parse(location.href);if(ti){if(ti.room===TC.room&&TC.me)TC.on=true;else tInv=ti;tab='talk';if(!parseLink(location.href))history.replaceState(null,'',location.pathname+location.search)}}
+if(TC.on&&TC.room&&TC.me)talkStart();
 const href=location.href,lk=parseLink(href);if(lk&&(D.ended||[]).includes(lk.room)){history.replaceState(null,'',location.pathname);overlay();connect();draw();if(!D.room)toast('这次连接已经结束，请在电脑上重新开始连接后再扫码')}else if(lk){if(standalone)history.replaceState(null,'',location.pathname);pair(href)}else{overlay();connect();draw()}
 vidLoad();
 // 网页版有新版本时：手边没在用就自动刷新；正在计时、录像、输入时，顶部提示点一下再更新
 // 新的离线缓存接手（sw）时就算刚刷新过也再刷新一次：它是整套重新下载的，刚才那次可能拿到新页面配旧文件（1.6 就因此看不到颠球）
 function appUpdated(sw){if(appUpdated.done)return;appUpdated.done=true;
  let recent=false;try{recent=!sw&&Date.now()-Number(sessionStorage.getItem('pe-reloaded')||0)<30000}catch{}
- const busy=running||cdEnd||recorder||(tab==='count'&&cn.phase!=='idle')||Object.keys(aiReq).length||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||$('dlg').open||$('scan');
+ const busy=pttHeld||!!tch||running||cdEnd||recorder||(tab==='count'&&cn.phase!=='idle')||Object.keys(aiReq).length||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||$('dlg').open||$('scan');
  if(!busy&&!recent){try{sessionStorage.setItem('pe-reloaded',String(Date.now()))}catch{}location.reload();return}
  $('upd').hidden=false}
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/androidplatform|app\.local/.test(location.host)){const hadSW=!!navigator.serviceWorker.controller;let chk=Date.now();

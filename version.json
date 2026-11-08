@@ -13,7 +13,15 @@
   "desktop": {
     "win": "",
     "mac": "",
-    "page": ""
+    "page": "",
+    "app": {
+      "version": "2.6.7",
+      "electron": "44",
+      "size": 1445467,
+      "sha256": "8fad8bc4811809863443727e0e0364480ad9a71eaf714de739a9270b4680263a",
+      "sig": "l+X73MW4NhyqjYs3MP1zO1PRFbie6lE22WZpJ6ccYKgVXQHhZ8spudebr8HCsvvI00kFsT3Enu+Ur0i8fDYcDA==",
+      "url": "desktop/app-2.6.7.asar"
+    }
   },
   "phone": {
     "version": "1.9.5",

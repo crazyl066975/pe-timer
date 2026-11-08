@@ -4,6 +4,7 @@
 
 - 打开就能看今天的课和教案，上课时计时、记成绩、记课堂练习、拍视频，直接传到老师自己的电脑。
 - 「对讲」：几个老师进同一个频道，按住说话，大家手机上直接放出来；打开对讲后锁屏、放口袋里也能听（苹果手机要 iOS 17.5 以上、用 Safari；安卓用 App，通知栏会显示「对讲开着」）。声音压缩后用 AES-GCM 加密，经中转站转给频道里的人，中转站不保存；密钥只在邀请链接 # 后面。
+- `desktop/`：电脑版「体育教师工作台」的自动更新文件，只有程序本身。工作台下载后要核对签名（Ed25519），对得上才会用。
 - 这里只放程序，**不存任何学生数据**。名单和成绩只在老师的手机和电脑之间加密传输（AES-GCM），密钥只在电脑上的二维码里。
 - 二维码识别使用开源库 jsQR（Apache License 2.0，见 `jsQR-LICENSE.txt`）；对讲邀请的二维码用 Kazuhiko Arase 的 QR Code Generator 生成（MIT 许可，写在 `qrcode.js` 开头）。
 - AI 计数使用开源的 MediaPipe Tasks Vision 和 Pose Landmarker Lite 模型（Apache License 2.0），颠球另用 Google 发布的 EfficientDet-Lite0 认物体模型（来源和说明见 `vendor/mediapipe/NOTICE.txt`）。动作识别全部在手机上完成，画面不上传。

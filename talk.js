@@ -33,14 +33,15 @@ function create(cname){const r=R(),{room,key}=r.newRoom();return {room,key,srv:r
 function link(c){return `${WEB}#tr=${c.room}&tk=${c.key}${c.srv?'&s='+encodeURIComponent(c.srv):''}&tn=${encodeURIComponent(c.cname||'')}`}
 function parse(txt){try{const s=String(txt||''),i=s.indexOf('#'),p=new URLSearchParams((i<0?s:s.slice(i+1)).split(/\s/)[0]),room=p.get('tr'),key=p.get('tk'),r=R();
  return r.okRoom(room)&&r.okKey(key)?{room,key,srv:clean(p.get('s'),80),cname:clean(p.get('tn'),12)||'对讲频道'}:null}catch{return null}}
-// ---------- 频道：o={room,key,srv,id,me,audio:()=>AudioContext,onChange} ----------
+// ---------- 频道：o={room,key,srv,id,me,audio:()=>AudioContext（没有就新建、叫醒）,peek:()=>现在的 AudioContext 或 null,onChange} ----------
 // 同时连自己的中转站和 EMQX（两边都发一份，收到的按随机数去重），有人只连得上其中一个也碰得上头
 function channel(o){const r=R(),mq=o.mqtt||r.mqtt,T=`pe-workbench/${o.room}/t`,me={id:String(o.id),n:clean(o.me,8)||'老师'},maxTalk=o.maxTalk||60000;
  const ready=crypto.subtle.importKey('raw',b64d(o.key),'AES-GCM',false,['encrypt','decrypt']);
  const members=new Map(),talkers=new Map(),seen=new Map(),ended=new Map(),hist=[];
- let conns=[],closed=false,upWas=false,lastHello=0,helloT=0,tx=null,rp=null,rpI=-1,outN=null,outA=null,rateOk=true,txQ=Promise.resolve(),rxQ=Promise.resolve();
+ let conns=[],closed=false,upWas=false,lastHello=0,helloT=0,tx=null,rp=null,rpI=-1,outN=null,outA=null,keepN=null,keepA=null,quiet=false,rateOk=true,txQ=Promise.resolve(),rxQ=Promise.resolve();
  const emit=e=>{try{o.onChange?.(e)}catch{}};
  const audio=()=>{let a=null;try{a=o.audio?.()||null}catch{}if(a&&a.state!=='running'&&a.state!=='closed')try{a.resume?.()?.catch?.(()=>{})}catch{}return a};
+ const cur=()=>{try{return (o.peek||o.audio)?.()||null}catch{return null}}; // 只看一眼现在的声卡，不新建、不叫醒
  // 苹果手机：放声音时不受静音键影响；开麦克风时切成「边录边放」
  const session=t=>{try{if(typeof navigator!=='undefined'&&navigator.audioSession)navigator.audioSession.type=t}catch{}};
  const ivk=b=>String.fromCharCode.apply(null,b.subarray(0,12));
@@ -60,16 +61,16 @@ function channel(o){const r=R(),mq=o.mqtt||r.mqtt,T=`pe-workbench/${o.room}/t`,m
   if(h.t==='a'&&bin)play(f,n,h,bin);else if(h.t==='e'){const tk=talkers.get(f);if(tk&&tk.k===String(h.k))finish(tk)}}
  // 收到一段就排在上一段后面放；第一段先等 0.35 秒（网络忽快忽慢也不断），前面响一声「嘀」
  function play(f,n,h,bin){const k=String(h.k).slice(0,12),q=h.q|0,c=Math.min(h.c|0,bin.length*2,RATE),p=Math.max(-32768,Math.min(32767,h.p|0)),i=Math.max(0,Math.min(88,h.i|0));if(c<=0)return;
-  let tk=talkers.get(f);if(tk&&tk.k!==k){finish(tk);tk=null}
-  if(!tk){if(ended.has(f+'|'+k))return;tk={f,n,k,q:-1,next:0,pcm:[],samples:0,at:Date.now(),last:0,start:true,missed:false};talkers.set(f,tk);stopReplay();emit('talk')}
-  if(q<=tk.q)return;tk.q=q;tk.last=Date.now();tk.n=n;
+  let tk=talkers.get(f),fresh=false;if(tk&&tk.k!==k){finish(tk);tk=null}
+  if(!tk){if(ended.has(f+'|'+k))return;tk={f,n,k,q:-1,next:0,pcm:[],samples:0,at:Date.now(),last:0,start:true,missed:false};talkers.set(f,tk);stopReplay();fresh=true}
+  if(q<=tk.q)return;tk.q=q;tk.last=Date.now();tk.n=n;if(fresh)emit('rx'); // 有人开始说了
   const pcm=adpcmDec(bin,c,p,i);if(tk.samples<RATE*maxTalk/1000){tk.pcm.push(pcm);tk.samples+=pcm.length}
-  const a=audio();if(!a||a.state!=='running'){tk.missed=true;return}
+  const a=quiet?null:audio();if(!a||a.state!=='running'){tk.missed=true;return}
   const now=a.currentTime;if(tk.start){tk.start=false;tk.next=now+LEAD;chirp(a,tk.next-.14,true)}else if(tk.next<now+.03)tk.next=now+.1;
   const s=a.createBufferSource();s.buffer=buffer(a,pcm);s.connect(out(a));s.start(tk.next);tk.next+=s.buffer.duration}
  // 说完了（收到「完」或 2 秒没有新的一段）：响一声「嘟」，这段话留在「刚才的话」里，可以重听
  function finish(tk){if(talkers.get(tk.f)!==tk)return;talkers.delete(tk.f);ended.set(tk.f+'|'+tk.k,Date.now());
-  const a=audio();if(a&&a.state==='running'&&!tk.start)chirp(a,Math.max(a.currentTime,tk.next)+.03,false);
+  const a=quiet?null:audio();if(a&&a.state==='running'&&!tk.start)chirp(a,Math.max(a.currentTime,tk.next)+.03,false);
   if(tk.samples>=RATE*.3){const all=new Int16Array(tk.samples);let x=0;for(const b of tk.pcm){all.set(b,x);x+=b.length}hist.unshift({n:tk.n,at:tk.at,dur:tk.samples/RATE,pcm:all,missed:tk.missed});if(rpI>=0)rpI++;
    let tot=0;for(let j=0;j<hist.length;j++){tot+=hist[j].pcm.length;if(j>=12||tot>RATE*240){hist.length=j;break}}}
   emit('talk')}
@@ -80,9 +81,16 @@ function channel(o){const r=R(),mq=o.mqtt||r.mqtt,T=`pe-workbench/${o.room}/t`,m
   const rr=a.sampleRate/RATE,m=Math.max(1,Math.floor(n*rr)),b=a.createBuffer(1,m,a.sampleRate),d=b.getChannelData(0);for(let k=0;k<m;k++){const x=k/rr,j=Math.floor(x),t=x-j,y0=pcm[j]||0,y1=j+1<n?pcm[j+1]:y0;d[k]=(y0+(y1-y0)*t)/32768}return b}
  // 压一压忽大忽小，再放大一点：操场上听得清
  function out(a){if(outA!==a){outA=a;const c=a.createDynamicsCompressor(),g=a.createGain();try{c.threshold.value=-20;c.knee.value=12;c.ratio.value=4;c.attack.value=.005;c.release.value=.2}catch{}g.gain.value=1.3;c.connect(g);g.connect(a.destination);outN=c}return outN}
+ // 锁屏也能听：对讲开着就一直放一个听不见的低音（25 赫兹、千分之一音量：喇叭放不出来，耳朵也听不到），
+ // 手机系统就当这个网页「正在放声音」，锁屏、切到后台都不把它冻住，连接和放声音都还在。声卡换了（苹果手机卡住后重建）就跟着换
+ function keep(){if(closed)return;const a=cur();if(!a||a.state!=='running'||(keepA===a&&keepN))return;stopKeep();
+  try{const v=a.createOscillator(),g=a.createGain();v.frequency.value=25;g.gain.value=.001;v.connect(g);g.connect(a.destination);v.start();keepN={v,g};keepA=a}catch{keepN=null;keepA=null}}
+ function stopKeep(){const k=keepN;keepN=null;keepA=null;if(k)try{k.v.stop();k.v.disconnect();k.g.disconnect()}catch{}}
  function replay(j){const e=hist[j];stopReplay();const a=audio();if(!e||!a||a.state!=='running')return 0;const s=a.createBufferSource();s.buffer=buffer(a,e.pcm);s.connect(out(a));s.start();rp=s;rpI=j;
   s.onended=()=>{if(rp===s){rp=null;rpI=-1;emit('replay')}};emit('replay');return e.dur}
  function stopReplay(){if(!rp)return;const s=rp;rp=null;rpI=-1;try{s.stop()}catch{}emit('replay')}
+ // 静音（锁屏界面、耳机上点了暂停）：连接照样连着，同事说的话照样记在「刚才的话」里，只是先不放；点播放再放
+ function mute(v){if(quiet===!!v)return;quiet=!!v;if(quiet)stopReplay();emit('mute')}
  function talker(){let b=null;const now=Date.now();for(const t of talkers.values())if(now-t.last<QUIET&&(!b||t.last>b.last))b=t;return b}
  // 按住说话：别人正在说、还没连上就不发。麦克风只在按住时打开（苹果手机开着麦克风时外放会变小声），松手就关
  async function startTalk(held){if(closed||tx)return 'again';if(talker())return 'busy';if(!conns.some(c=>c.up))return 'offline';
@@ -100,17 +108,21 @@ function channel(o){const r=R(),mq=o.mqtt||r.mqtt,T=`pe-workbench/${o.room}/t`,m
   if(t.since){if(t.acc.length>=80)chunk(t,t.acc.splice(0));queue({t:'e',f:me.id,n:me.n,k:t.k,q:t.q})}session('playback');emit('tx')}
  // 手机从后台回来时连接可能已经断了却没报：直接重连一次
  function refresh(){if(closed)return;for(const c of conns)c.close();upWas=false;open();emit('net')}
- function close(){if(closed)return;stopTalk();stopReplay();const bye=send({t:'b',f:me.id,n:me.n}).catch(()=>{}),cs=conns;closed=true;clearInterval(tick);clearTimeout(helloT);talkers.clear();members.clear();session('auto');
+ function close(){if(closed)return;stopTalk();stopReplay();const bye=send({t:'b',f:me.id,n:me.n}).catch(()=>{}),cs=conns;closed=true;clearInterval(tick);clearTimeout(helloT);stopKeep();talkers.clear();members.clear();session('auto');
   bye.finally(()=>setTimeout(()=>cs.forEach(c=>c.close()),400))}
- const tick=setInterval(()=>{if(closed)return;const now=Date.now();for(const t of [...talkers.values()])if(now-t.last>QUIET+800)finish(t);
+ function beat(){if(closed)return;const now=Date.now();for(const t of [...talkers.values()])if(now-t.last>QUIET+800)finish(t);
   let gone=false;for(const [id,m] of members)if(now-m.at>GONE){members.delete(id);gone=true}if(gone)emit('members');
   if(now-lastHello>HELLO&&conns.some(c=>c.up))hello();
   for(const [k,v] of seen)if(now-v>120000)seen.delete(k);for(const [k,v] of ended)if(now-v>60000)ended.delete(k);
-  if(talkers.size||tx)emit('tick')},300);
+  keep();if(talkers.size||tx)emit('tick')}
+ const tick=setInterval(beat,300);
+ // 手机锁屏、切到后台时网页的定时器会被放慢：App 每隔几秒（页面回到前台时也）叫一下，马上做一遍上面的事；
+ // 连接该发心跳就发，stale 毫秒没动静就当断了重连，断着的马上连
+ function pulse(stale){if(closed)return;beat();for(const c of conns)try{c.kick?.(stale)}catch{}}
  open();session('playback');
- return {get up(){return conns.some(c=>c.up)},get tx(){return tx?(tx.since?'on':'wait'):''},get txSince(){return tx?.since||0},get level(){return tx?.level||0},get replaying(){return rpI},get closed(){return closed},hist,
+ return {get up(){return conns.some(c=>c.up)},get tx(){return tx?(tx.since?'on':'wait'):''},get txSince(){return tx?.since||0},get level(){return tx?.level||0},get replaying(){return rpI},get closed(){return closed},get keeping(){return !!keepN},get muted(){return quiet},hist,
   members:()=>{const now=Date.now();return [...members].filter(([,m])=>now-m.at<GONE).map(([id,m])=>({id,n:m.n}))},talker:()=>{const t=talker();return t?{n:t.n,at:t.at}:null},
-  startTalk,stopTalk,replay,stopReplay,refresh,close}
+  startTalk,stopTalk,replay,stopReplay,refresh,pulse,keep,mute,close}
 }
 const api={RATE,CHUNK,WEB,adpcmEnc,adpcmDec,downsampler,pack,unpack,create,link,parse,channel,newId:()=>rid(4)};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.PETalk=api;

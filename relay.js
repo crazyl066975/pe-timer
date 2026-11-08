@@ -21,7 +21,7 @@ const okKey=k=>{try{return typeof k==='string'&&b64u.from(k).length===32}catch{r
 const str=s=>{const b=enc.encode(s);return [b.length>>8,b.length&255,...b]};
 function packet(type,body){const len=[];let n=body.length;do{let d=n%128;n=Math.floor(n/128);if(n)d|=128;len.push(d)}while(n);const out=new Uint8Array(1+len.length+body.length);out[0]=type;out.set(len,1);out.set(body,1+len.length);return out}
 function mqtt({urls=BROKERS,topic,onMessage,onState}){
- let ws=null,closed=false,buf=new Uint8Array(0),tries=0,ping=0,seen=0,timer=0,up=false;
+ let ws=null,closed=false,buf=new Uint8Array(0),tries=0,ping=0,seen=0,pinged=0,timer=0,up=false;
  const state=v=>{if(up!==v){up=v;onState?.(v)}};
  function open(){if(closed)return;const url=urls[tries%urls.length];tries++;
   try{ws=new WebSocket(url,'mqtt')}catch{return retry()}ws.binaryType='arraybuffer';
@@ -29,14 +29,18 @@ function mqtt({urls=BROKERS,topic,onMessage,onState}){
   ws.onmessage=e=>{seen=Date.now();const a=new Uint8Array(e.data),b=new Uint8Array(buf.length+a.length);b.set(buf);b.set(a,buf.length);buf=b;read()};
   ws.onclose=()=>{state(false);clearInterval(ping);retry()};ws.onerror=()=>{try{ws.close()}catch{}}}
  function retry(){if(closed)return;clearTimeout(timer);timer=setTimeout(open,Math.min(10000,800*tries))}
+ // 心跳：stale 毫秒（默认 50 秒）没收到任何东西就当断了，关掉重连；不然发一个 PINGREQ
+ function beat(stale){if(ws?.readyState!==1)return;if(Date.now()-seen>(stale||50000)){try{ws.close()}catch{}return}pinged=Date.now();try{ws.send(Uint8Array.from([0xc0,0]))}catch{}}
  function read(){for(;;){let i=1,mul=1,len=0,d;do{if(i>=buf.length)return;d=buf[i++];len+=(d&127)*mul;mul*=128}while(d&128);if(buf.length<i+len)return;
   const h=buf[0],type=h>>4,body=buf.slice(i,i+len);buf=buf.slice(i+len);
   if(type===2){if(body[1]!==0){try{ws.close()}catch{}return}tries=0;ws.send(packet(0x82,Uint8Array.from([0,1,...str(topic),0])));
-   seen=Date.now();clearInterval(ping);ping=setInterval(()=>{if(Date.now()-seen>50000){try{ws.close()}catch{}return}try{ws.send(Uint8Array.from([0xc0,0]))}catch{}},20000)}
+   seen=Date.now();clearInterval(ping);ping=setInterval(()=>beat(),20000)}
   else if(type===9)state(true);
   else if(type===3){const tl=(body[0]<<8)|body[1],qos=(h>>1)&3;onMessage?.(dec.decode(body.slice(2,2+tl)),body.slice(2+tl+(qos?2:0)))}}}
  open();
  return {publish(t,payload){if(!up||ws?.readyState!==1)return false;try{ws.send(packet(0x30,Uint8Array.from([...str(t),...payload])));return true}catch{return false}},
+  // 手机锁屏、切到后台时定时器会被放慢：叫一下，该发心跳就发，太久没动静就重连，断着就马上连（不等重试的定时器）
+  kick(stale){if(closed)return;if(!ws||ws.readyState===3){clearTimeout(timer);open()}else if(ws.readyState===1&&up&&(Date.now()-pinged>15000||Date.now()-seen>(stale||50000)))beat(stale)},
   close(){closed=true;clearTimeout(timer);clearInterval(ping);try{ws?.close()}catch{}state(false)},get up(){return up}};
 }
 // ---------- 加密房间：side='desk' 收手机发来的，side='phone' 收电脑发来的 ----------

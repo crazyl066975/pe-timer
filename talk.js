@@ -4,7 +4,7 @@
 (function(root){
 const R=()=>root.PERelay||(typeof require==='function'?require('./relay.js'):null);
 const enc=new TextEncoder(),dec=new TextDecoder();
-const RATE=8000,CHUNK=1600,LEAD=.35,QUIET=1200,GONE=70000,HELLO=25000,WEB='https://crazyl066975.github.io/pe-timer/';
+const RATE=8000,CHUNK=1600,LEAD=.35,QUIET=1200,GONE=70000,HELLO=25000,PIECE=5*RATE,WEB='https://crazyl066975.github.io/pe-timer/';
 const MIC={audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1}};
 const hex=b=>Array.from(b,x=>x.toString(16).padStart(2,'0')).join(''),rid=n=>hex(crypto.getRandomValues(new Uint8Array(n)));
 const b64d=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
@@ -33,15 +33,20 @@ function create(cname){const r=R(),{room,key}=r.newRoom();return {room,key,srv:r
 function link(c){return `${WEB}#tr=${c.room}&tk=${c.key}${c.srv?'&s='+encodeURIComponent(c.srv):''}&tn=${encodeURIComponent(c.cname||'')}`}
 function parse(txt){try{const s=String(txt||''),i=s.indexOf('#'),p=new URLSearchParams((i<0?s:s.slice(i+1)).split(/\s/)[0]),room=p.get('tr'),key=p.get('tk'),r=R();
  return r.okRoom(room)&&r.okKey(key)?{room,key,srv:clean(p.get('s'),80),cname:clean(p.get('tn'),12)||'对讲频道'}:null}catch{return null}}
-// ---------- 频道：o={room,key,srv,id,me,audio:()=>AudioContext（没有就新建、叫醒）,peek:()=>现在的 AudioContext 或 null,onChange} ----------
+// ---------- 频道：o={room,key,srv,id,me,audio:()=>AudioContext（没有就新建、叫醒）,peek:()=>现在的 AudioContext 或 null,onChange,
+// backup:(pcm,first,last)=>交给播放器放（声卡被停了时用；放得了回 true）,hidden:()=>页面看不见（锁屏、切走）,log:文字=>记一笔（对讲页的「声音记录」）} ----------
 // 同时连自己的中转站和 EMQX（两边都发一份，收到的按随机数去重），有人只连得上其中一个也碰得上头
 function channel(o){const r=R(),mq=o.mqtt||r.mqtt,T=`pe-workbench/${o.room}/t`,me={id:String(o.id),n:clean(o.me,8)||'老师'},maxTalk=o.maxTalk||60000;
  const ready=crypto.subtle.importKey('raw',b64d(o.key),'AES-GCM',false,['encrypt','decrypt']);
  const members=new Map(),talkers=new Map(),seen=new Map(),ended=new Map(),hist=[];
  let conns=[],closed=false,upWas=false,lastHello=0,helloT=0,tx=null,rp=null,rpI=-1,outN=null,outA=null,keepN=null,keepA=null,quiet=false,rateOk=true,txQ=Promise.resolve(),rxQ=Promise.resolve();
- const emit=e=>{try{o.onChange?.(e)}catch{}};
+ const emit=e=>{try{o.onChange?.(e)}catch{}},log=s=>{try{o.log?.(s)}catch{}};
  const audio=()=>{let a=null;try{a=o.audio?.()||null}catch{}if(a&&a.state!=='running'&&a.state!=='closed')try{a.resume?.()?.catch?.(()=>{})}catch{}return a};
  const cur=()=>{try{return (o.peek||o.audio)?.()||null}catch{return null}}; // 只看一眼现在的声卡，不新建、不叫醒
+ // 声卡的钟还走不走：苹果手机锁屏后常把网页的声卡停掉（状态变 interrupted），有时状态还写着 running、钟却不走了。亮着屏时只看状态
+ let ckA=null,ckT=-1,ckAt=0,ckOk=true;
+ function ticking(a){const now=Date.now(),t=a.currentTime;if(a!==ckA||t!==ckT){ckA=a;ckT=t;ckAt=now;ckOk=true}else if(now-ckAt>700)ckOk=false;return ckOk}
+ const live=a=>{if(!a||a.state!=='running')return false;const k=ticking(a);let h=false;try{h=!!o.hidden?.()}catch{}return k||!h};
  // 苹果手机：放声音时不受静音键影响；开麦克风时切成「边录边放」
  const session=t=>{try{if(typeof navigator!=='undefined'&&navigator.audioSession)navigator.audioSession.type=t}catch{}};
  const ivk=b=>String.fromCharCode.apply(null,b.subarray(0,12));
@@ -62,18 +67,29 @@ function channel(o){const r=R(),mq=o.mqtt||r.mqtt,T=`pe-workbench/${o.room}/t`,m
  // 收到一段就排在上一段后面放；第一段先等 0.35 秒（网络忽快忽慢也不断），前面响一声「嘀」
  function play(f,n,h,bin){const k=String(h.k).slice(0,12),q=h.q|0,c=Math.min(h.c|0,bin.length*2,RATE),p=Math.max(-32768,Math.min(32767,h.p|0)),i=Math.max(0,Math.min(88,h.i|0));if(c<=0)return;
   let tk=talkers.get(f),fresh=false;if(tk&&tk.k!==k){finish(tk);tk=null}
-  if(!tk){if(ended.has(f+'|'+k))return;tk={f,n,k,q:-1,next:0,pcm:[],samples:0,at:Date.now(),last:0,start:true,missed:false};talkers.set(f,tk);stopReplay();fresh=true}
+  if(!tk){if(ended.has(f+'|'+k))return;tk={f,n,k,q:-1,next:0,pcm:[],samples:0,at:Date.now(),last:0,start:true,missed:false,lp:[],bk:null,ac:null,c0:-1};talkers.set(f,tk);stopReplay();fresh=true}
   if(q<=tk.q)return;tk.q=q;tk.last=Date.now();tk.n=n;if(fresh)emit('rx'); // 有人开始说了
   const pcm=adpcmDec(bin,c,p,i);if(tk.samples<RATE*maxTalk/1000){tk.pcm.push(pcm);tk.samples+=pcm.length}
-  const a=quiet?null:audio();if(!a||a.state!=='running'){tk.missed=true;return}
-  const now=a.currentTime;if(tk.start){tk.start=false;tk.next=now+LEAD;chirp(a,tk.next-.14,true)}else if(tk.next<now+.03)tk.next=now+.1;
-  const s=a.createBufferSource();s.buffer=buffer(a,pcm);s.connect(out(a));s.start(tk.next);tk.next+=s.buffer.duration}
+  if(quiet){tk.missed=true;return}
+  const a=tk.bk?null:audio(); // 这段话已经改用播放器放了，就一直用播放器放完
+  if(a&&live(a)){const now=a.currentTime;if(tk.start){tk.start=false;tk.next=now+LEAD;tk.c0=tk.next-.14;chirp(a,tk.c0,true)}else if(tk.next<now+.03)tk.next=now+.1;
+   const s=a.createBufferSource();s.buffer=buffer(a,pcm);s.connect(out(a));s.start(tk.next);tk.next+=s.buffer.duration;tk.ac=a;tk.lp.push({pcm,end:tk.next});if(tk.lp.length>15)tk.lp.shift();return}
+  // 声卡用不了（多半是锁屏后被系统停了）：交给播放器放（o.backup）。先补上声卡里排着、钟停的时候还没放完的那几段
+  if(!o.backup){tk.missed=true;return}
+  if(!tk.bk){let t=0;try{t=tk.ac?tk.ac.currentTime:0}catch{}const buf=tk.lp.filter(x=>x.end>t+.02).map(x=>x.pcm);tk.bk={buf,n:buf.reduce((s,x)=>s+x.length,0),first:tk.start||t<tk.c0+.12,dead:false};tk.start=false;tk.lp=[];
+   log(`声卡${!a?'没有':a.state==='running'?'的钟停了':a.state}：${tk.n}说的话改用播放器放`)}
+  tk.bk.buf.push(pcm);tk.bk.n+=pcm.length;if(tk.bk.n>=PIECE)flush(tk,false)}
+ // 交给播放器一段。说得长就不等说完：在最后 1.5 秒里找最安静的地方（说话的停顿处）切开，先放前面，剩下的留到下一段
+ function flush(tk,last){const b=tk.bk;if(b.dead||(!b.n&&!last))return;const all=new Int16Array(b.n);let x=0;for(const p of b.buf){all.set(p,x);x+=p.length}
+  let cut=all.length;if(!last){const W=320;let best=Infinity;for(let j=Math.max(0,all.length-12000);j+W<=all.length;j+=160){let q=0;for(let k=j;k<j+W;k++)q+=all[k]*all[k];if(q<best){best=q;cut=j+W/2}}}
+  const piece=all.subarray(0,cut),rest=all.slice(cut);b.buf=rest.length?[rest]:[];b.n=rest.length;
+  let ok=false;try{ok=!!o.backup(piece,b.first,last)}catch{}b.first=false;if(!ok){b.dead=true;tk.missed=true;log('播放器也放不出来')}}
  // 说完了（收到「完」或 2 秒没有新的一段）：响一声「嘟」，这段话留在「刚才的话」里，可以重听
  function finish(tk){if(talkers.get(tk.f)!==tk)return;talkers.delete(tk.f);ended.set(tk.f+'|'+tk.k,Date.now());
-  const a=quiet?null:audio();if(a&&a.state==='running'&&!tk.start)chirp(a,Math.max(a.currentTime,tk.next)+.03,false);
+  if(tk.bk)flush(tk,true);else{const a=quiet?null:audio();if(a&&a.state==='running'&&!tk.start)chirp(a,Math.max(a.currentTime,tk.next)+.03,false)}
   if(tk.samples>=RATE*.3){const all=new Int16Array(tk.samples);let x=0;for(const b of tk.pcm){all.set(b,x);x+=b.length}hist.unshift({n:tk.n,at:tk.at,dur:tk.samples/RATE,pcm:all,missed:tk.missed});if(rpI>=0)rpI++;
    let tot=0;for(let j=0;j<hist.length;j++){tot+=hist[j].pcm.length;if(j>=12||tot>RATE*240){hist.length=j;break}}}
-  emit('talk')}
+  log(`${tk.n}说了 ${(tk.samples/RATE).toFixed(1)} 秒：${tk.missed?(quiet?'静音着，没放':'没放出来'):tk.bk?'用播放器放的':'声卡放的'}`);emit('talk')}
  function chirp(a,at,up){try{const v=a.createOscillator(),g=a.createGain();at=Math.max(at,a.currentTime);v.frequency.setValueAtTime(up?1050:900,at);v.frequency.setValueAtTime(up?1450:620,at+.05);
   g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(.18,at+.01);g.gain.setValueAtTime(.18,at+.08);g.gain.exponentialRampToValueAtTime(.0001,at+.11);v.connect(g);g.connect(out(a));v.start(at);v.stop(at+.12)}catch{}}
  // 老的苹果系统建不了 8000 的声音缓冲，就自己插值到手机的采样率
@@ -114,7 +130,7 @@ function channel(o){const r=R(),mq=o.mqtt||r.mqtt,T=`pe-workbench/${o.room}/t`,m
   let gone=false;for(const [id,m] of members)if(now-m.at>GONE){members.delete(id);gone=true}if(gone)emit('members');
   if(now-lastHello>HELLO&&conns.some(c=>c.up))hello();
   for(const [k,v] of seen)if(now-v>120000)seen.delete(k);for(const [k,v] of ended)if(now-v>60000)ended.delete(k);
-  keep();if(talkers.size||tx)emit('tick')}
+  const a=cur();if(a&&a.state==='running')ticking(a);keep();if(talkers.size||tx)emit('tick')}
  const tick=setInterval(beat,300);
  // 手机锁屏、切到后台时网页的定时器会被放慢：App 每隔几秒（页面回到前台时也）叫一下，马上做一遍上面的事；
  // 连接该发心跳就发，stale 毫秒没动静就当断了重连，断着的马上连

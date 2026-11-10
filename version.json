@@ -15,12 +15,12 @@
     "mac": "",
     "page": "",
     "app": {
-      "version": "2.6.7",
+      "version": "2.6.8",
       "electron": "44",
-      "size": 1445467,
-      "sha256": "8fad8bc4811809863443727e0e0364480ad9a71eaf714de739a9270b4680263a",
-      "sig": "l+X73MW4NhyqjYs3MP1zO1PRFbie6lE22WZpJ6ccYKgVXQHhZ8spudebr8HCsvvI00kFsT3Enu+Ur0i8fDYcDA==",
-      "url": "desktop/app-2.6.7.asar"
+      "size": 1446244,
+      "sha256": "500c5a1ce748927f082ba9da768bd74ba3686961e43d9e35f2a7d3d30920a99a",
+      "sig": "1GjlrnobdF9sYOHcnIcGXp+3DcOuySLvtKyjWgLXHrblkbo7FmlFjD1Z+FW/OruhMMRq17NKdXXnqWhC/88dBw==",
+      "url": "desktop/app-2.6.8.asar"
     }
   },
   "phone": {
